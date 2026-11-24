@@ -20,7 +20,19 @@ make test H=16 W=16 TILE=4
 make test H=32 W=32 TILE=4 IMAGE=benchmarks/Cameraman.png
 ```
 
-The [CI workflow](../.github/workflows/ci.yml) runs the software checks, the RTL model sweep, `make test` for two frame sizes and the MATLAB `test_all` (under Octave) on every push.
+The [CI workflow](../.github/workflows/ci.yml) runs the software checks, the RTL model sweep, the RTL regression at three frame sizes and the MATLAB `test_all` (under Octave) on every push.
+
+## Simulation results
+
+Icarus Verilog, six frames per architecture and size, every coefficient, index and `out_last` compared with the integer oracle. Compute clocks as printed by the testbench:
+
+| Frame, TILE | ARCH 0 | ARCH 1 | ARCH 2 | ARCH 3 | ARCH 4 | ARCH 5 |
+|---|---:|---:|---:|---:|---:|---:|
+| 8 × 12, 2 | 96 | 96 | 24 | 168 | 318 | 288 |
+| 4 × 4, 1 | 16 | 16 | 4 | 28 | 104 | 48 |
+| 16 × 16, 4 | 256 | 256 | 64 | 448 | 548 | 768 |
+
+All 18 configurations pass bit-exact, and every count equals the closed-form schedule and the cycle-accurate model ([`python/rtl_model.py`](../python/rtl_model.py)).
 
 ## Synthesis
 

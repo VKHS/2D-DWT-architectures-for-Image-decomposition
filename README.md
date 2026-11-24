@@ -157,8 +157,8 @@ Gate-level schematics of the processing elements: [FIR pair, 7 adders](figures/d
 | Perfect reconstruction | same test; integer images through 3 levels | float error ≤ 1 × 10⁻¹⁵; integer input reconstructs exactly |
 | Integer oracle | [`hardware/golden.py`](hardware/golden.py): independent outer-product Q6 masks against all six software methods | bit-exact on 6 test frames |
 | RTL schedules | [`python/rtl_model.py --check`](python/rtl_model.py): clock-by-clock replay of `dwt53_frame.v`, 9 sizes, all ARCH and valid TILE values | 183 runs bit-exact; clock counts equal the formulas |
-| RTL simulation | `make test` with Icarus Verilog: six frames per ARCH with input gaps and output stalls, every coefficient, index and `out_last` checked | runs in [CI](.github/workflows/ci.yml) on every push |
-| MATLAB | `test_all` (Octave-compatible) | runs in [CI](.github/workflows/ci.yml) on every push |
+| RTL simulation | `make test` with Icarus Verilog: six frames per ARCH with input gaps and output stalls, every coefficient, index and `out_last` checked | all six ARCH pass at 8 × 12, 4 × 4 and 16 × 16 in [CI](.github/workflows/ci.yml); simulated compute clocks equal the RTL model |
+| MATLAB | `test_all` under Octave | passes in [CI](.github/workflows/ci.yml) |
 
 Software runtimes for a 512 × 512 image, three levels (Python 3.13, NumPy 2.5; median of 5): lifting 4.1 ms, FIR 16 ms, direct 2-D 25 ms, folded 41 ms, line 111 ms, tile 352 ms. These are interpreter timings of reference code, not hardware throughput.
 
