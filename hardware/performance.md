@@ -1,6 +1,6 @@
 # Performance
 
-**Author: Abdolvahab Khalili Sadaghiani**
+**Author: Abdolvahab Khalili Sadaghiani** · ORCID [0000-0003-4870-2768](https://orcid.org/0000-0003-4870-2768)
 
 *N* = *H*·*W*, *T* = TILE, *P* = 2*T* + 3. Compute clocks run from the clock after the last input handshake to the first `out_valid`; LOAD and DRAIN add *N* handshakes each plus any stalls, and the three frame stages do not overlap. Every value below is reproduced clock by clock by [`python/rtl_model.py`](../python/rtl_model.py).
 

@@ -262,3 +262,129 @@ def segmented_bar(fig, rect, shares, colors, labels, height_px: float = 26, dpi:
                         fontweight="semibold")
         x += share
     return ax
+
+
+# Showcase (dark) style ------------------------------------------------------
+DARK = "#111213"
+DARK_INK = "#f0efec"
+DARK_INK2 = "#b9b8b0"
+
+SHOWCASE_IMAGES = {
+    # name: (scikit-image loader, caption, licence)
+    "rocket": ("rocket", "Rocket launch", "public domain (SpaceX)"),
+    "coins": ("coins", "Greek coins", "no known copyright restrictions (Brooklyn Museum)"),
+    "retina": ("retina", "Retina", "CC0 (Wikimedia Commons)"),
+    "chelsea": ("chelsea", "Cat (Chelsea)", "CC0 (Stefan van der Walt)"),
+    "coffee": ("coffee", "Coffee", "CC0 (Rachel Michetti)"),
+    "camera": ("camera", "Cameraman", "CC0 (Lav Varshney)"),
+    "brick": ("brick", "Brick", "CC0"),
+    "phantom": ("shepp_logan_phantom", "Shepp–Logan phantom", "synthetic"),
+}
+
+
+def siemens_star(n: int = 512, spokes: int = 36, oversample: int = 4) -> np.ndarray:
+    """Anti-aliased Siemens star test chart in [0, 1] on a mid-gray field."""
+    m = n * oversample
+    yy, xx = (np.mgrid[:m, :m] - m / 2 + 0.5) / oversample
+    star = (np.sin(spokes * np.arctan2(yy, xx)) > 0).astype(float)
+    star[np.hypot(xx, yy) > 0.47 * n] = 0.5
+    return star.reshape(n, oversample, n, oversample).mean(axis=(1, 3))
+
+
+def load_color(name: str, shape=None, crop=None) -> np.ndarray:
+    """Sample image as float RGB in [0, 1].
+
+    ``crop`` = (top, left, height, width) in source pixels (default: centred
+    square); ``shape`` = (H, W) output size (default: crop size).
+    """
+    from PIL import Image
+    from skimage import data
+    attr = SHOWCASE_IMAGES.get(name, (name,))[0]
+    a = getattr(data, attr)()
+    if a.dtype != np.uint8:
+        a = np.clip(np.rint(a * 255 if a.max() <= 1.0 else a), 0, 255).astype(np.uint8)
+    img = Image.fromarray(a).convert("RGB")
+    w, h = img.size
+    if crop is None:
+        s = min(w, h)
+        crop = ((h - s) // 2, (w - s) // 2, s, s)
+    t, l, ch, cw = crop
+    img = img.crop((l, t, l + cw, t + ch))
+    if shape is not None and (shape[1], shape[0]) != img.size:
+        img = img.resize((shape[1], shape[0]), Image.Resampling.LANCZOS)
+    return np.asarray(img, dtype=float) / 255.0
+
+
+def decompose_rgb(x: np.ndarray, levels: int) -> np.ndarray:
+    """Per-channel multilevel decomposition of an (H, W, 3) image."""
+    from dwt import decompose
+    return np.stack([decompose(x[..., k], levels, "lifting") for k in range(x.shape[2])], axis=-1)
+
+
+def reconstruct_rgb(c: np.ndarray, levels: int) -> np.ndarray:
+    from dwt import reconstruct
+    return np.stack([reconstruct(c[..., k], levels) for k in range(c.shape[2])], axis=-1)
+
+
+def glow_pyramid(c: np.ndarray, levels: int, gamma: float = 0.55, pct: float = 99.6,
+                 gray_tint=(0.98, 0.93, 0.80)) -> np.ndarray:
+    """Render a packed pyramid as light on black.
+
+    LL keeps its natural colour; every detail band shows coefficient
+    magnitude per colour channel (edges glow in the colour of the change),
+    one robust scale per level, gamma-compressed. 2-D input is drawn with a
+    warm gray tint.
+    """
+    cc = c if c.ndim == 3 else c[..., None]
+    h, w = cc.shape[:2]
+    out = np.zeros((h, w, 3))
+    for j in range(1, levels + 1):
+        hh, ww = h >> j, w >> j
+        regs = [(slice(0, hh), slice(ww, 2 * ww)), (slice(hh, 2 * hh), slice(0, ww)),
+                (slice(hh, 2 * hh), slice(ww, 2 * ww))]
+        mags = np.concatenate([np.abs(cc[r]).ravel() for r in regs])
+        lim = max(np.percentile(mags, pct), 1e-12)
+        for r in regs:
+            v = np.clip(np.abs(cc[r]) / lim, 0, 1) ** gamma
+            out[r] = v if v.shape[-1] == 3 else v * np.array(gray_tint)
+    hh, ww = h >> levels, w >> levels
+    ll = np.clip(cc[:hh, :ww], 0, 1)
+    out[:hh, :ww] = ll if ll.shape[-1] == 3 else np.repeat(ll, 3, axis=-1)
+    return np.clip(out, 0, 1)
+
+
+def dark_band_grid(ax, shape, levels: int, labels: bool = True, fontsize: float = 8.0,
+                   min_label_px: int = 28, lw: float = 1.0) -> None:
+    """Thin separators and band names for a pyramid drawn on black."""
+    h, w = shape[:2]
+    for j in range(1, levels + 1):
+        hh, ww = h >> j, w >> j
+        ax.plot([ww - 0.5, ww - 0.5], [-0.5, 2 * hh - 0.5], color="#3a3b3d", lw=lw)
+        ax.plot([-0.5, 2 * ww - 0.5], [hh - 0.5, hh - 0.5], color="#3a3b3d", lw=lw)
+    if not labels:
+        return
+    for name, j, (rs, cs) in band_slices(shape[:2], levels):
+        if rs.stop - rs.start < min_label_px:
+            continue
+        ax.text(cs.start + 4, rs.start + 4, name, ha="left", va="top", fontsize=fontsize,
+                color=DARK_INK, fontweight="semibold",
+                bbox=dict(boxstyle="round,pad=0.15", fc=DARK, ec="none", alpha=0.7))
+
+
+def pill_row(fig, x, y, labels, edge_colors, fontsize=10.5, pad=0.55, gap_pt=7.0,
+             face="#232426", ink=DARK_INK):
+    """Row of capsule labels starting at figure x, centred on figure y.
+
+    Widths are measured with the renderer, so labels never overlap.
+    Returns the figure x of the right edge of the last capsule.
+    """
+    r = fig.canvas.get_renderer()
+    fig_w = fig.get_figwidth() * fig.dpi
+    pad_px = pad * fontsize * fig.dpi / 72
+    gap_px = gap_pt * fig.dpi / 72
+    for lab, col in zip(labels, edge_colors):
+        t = fig.text(x + pad_px / fig_w, y, lab, ha="left", va="center", fontsize=fontsize, color=ink,
+                     bbox=dict(boxstyle=f"round,pad={pad},rounding_size=0.95", fc=face, ec=col, lw=1.4))
+        bb = t.get_window_extent(r)
+        x = (bb.x1 + pad_px + gap_px) / fig_w
+    return x - gap_px / fig_w

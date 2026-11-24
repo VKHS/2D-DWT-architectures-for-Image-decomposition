@@ -1,6 +1,6 @@
 # Architecture cost model
 
-**Author: Abdolvahab Khalili Sadaghiani**
+**Author: Abdolvahab Khalili Sadaghiani** · ORCID [0000-0003-4870-2768](https://orcid.org/0000-0003-4870-2768)
 
 All six schedules compute the same coefficients, so they are compared on what differs: compute clocks, working storage, memory traffic and read-port pressure. Every number below comes from the closed-form schedule and is reproduced clock by clock by the RTL model ([`python/rtl_model.py`](../python/rtl_model.py)).
 

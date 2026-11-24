@@ -1,6 +1,6 @@
 # Bit-true worked example
 
-**Author: Abdolvahab Khalili Sadaghiani**
+**Author: Abdolvahab Khalili Sadaghiani** · ORCID [0000-0003-4870-2768](https://orcid.org/0000-0003-4870-2768)
 
 A 4 × 4 frame, small enough to follow every operation. All numbers below are produced by [`hardware/golden.py`](golden.py) and by [`python/rtl_model.py`](../python/rtl_model.py) for every ARCH.
 

@@ -1,4 +1,4 @@
-// Project author and maintainer: Abdolvahab Khalili Sadaghiani (VKHS).
+// Author: Abdolvahab Khalili Sadaghiani (VKHS), ORCID 0000-0003-4870-2768. MIT License.
 // Single-level CDF 5/3, unsigned 8-bit samples, exact signed Q6 output.
 // Verilog-2001 datapath reference. H,W even; ARCH=4 requires H/2,W/2
 // divisible by TILE. Frame-buffered reference; not a line-rate AXI core.

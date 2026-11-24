@@ -8,6 +8,7 @@ authors:
     orcid: "https://orcid.org/0000-0003-4870-2768"
     affiliation: "Department of Electrical Engineering, Linköping University, Linköping, Sweden"
 repository-code: "https://github.com/VKHS/2D-DWT-architectures-for-Image-decomposition"
+license: MIT
 abstract: >-
   Six schedules of the separable 2-D CDF 5/3 discrete wavelet transform
   (row-column FIR, fused lifting, direct 2-D, five-row line buffer,

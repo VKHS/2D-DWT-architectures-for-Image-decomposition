@@ -1,6 +1,6 @@
 # Datapath, arithmetic and interface
 
-**Author: Abdolvahab Khalili Sadaghiani**
+**Author: Abdolvahab Khalili Sadaghiani** · ORCID [0000-0003-4870-2768](https://orcid.org/0000-0003-4870-2768)
 
 ## Processing elements
 

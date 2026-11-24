@@ -1,8 +1,8 @@
 # Examples
 
-**Author: Abdolvahab Khalili Sadaghiani**
+**Author: Abdolvahab Khalili Sadaghiani** · ORCID [0000-0003-4870-2768](https://orcid.org/0000-0003-4870-2768)
 
-Eleven runnable examples, one per computed figure. Each script is self-contained, uses the code in [`python/`](../python), writes its figure to [`figures/examples/`](../figures/examples) and asserts what it shows (equivalence of the six schedules, perfect reconstruction, bit-exact RTL model). Run one with `python examples/ex05_gallery.py`, or all with `make figures`.
+Thirteen runnable examples, one per computed figure or animation. Each script is self-contained, uses the code in [`python/`](../python), writes its figure to [`figures/examples/`](../figures/examples) and asserts what it shows (equivalence of the six schedules, perfect reconstruction, bit-exact RTL model). Run one with `python examples/ex05_gallery.py`, or all with `make figures`.
 
 | # | Script | Shows | Key result |
 |---:|---|---|---|
@@ -17,6 +17,8 @@ Eleven runnable examples, one per computed figure. Each script is self-contained
 | 9 | [ex09_rtl_schedules.py](ex09_rtl_schedules.py) | write order and pixel re-reads of the six RTL schedules | 2.5 to 6.25 frame reads per pixel, same coefficients |
 | 10 | [ex10_hardware_costs.py](ex10_hardware_costs.py) | clocks, traffic, ports, storage, tile sweep | ARCH 4 at *T* = 8: 1.66 *N* clocks, 1.41 reads per pixel, 361 B |
 | 11 | [ex11_fixed_point.py](ex11_fixed_point.py) | exact integer ranges | every final band fits 16-bit signed |
+| 12 | [ex12_showcase.py](ex12_showcase.py) | banner, eight test images, coarse-to-fine synthesis | 99 % of the energy in 4.8 % (phantom) to 25.6 % (cat) of the coefficients |
+| 13 | [ex13_schedule_animation.py](ex13_schedule_animation.py) | the six RTL schedules on one clock (GIF) | finish at 0.25, 1, 1, 1.66, 1.75 and 3 *N* with identical bits |
 
 ## 1. One level: four subbands
 
@@ -28,7 +30,9 @@ The orientation card contains vertical, horizontal and diagonal bars and a disk.
 
 ![Multilevel pyramid](../figures/examples/02_multilevel_pyramid.png)
 
-Only LL is split again. The same script writes the README hero image, which runs the forward and inverse transforms on the 8-bit image and reports the maximum reconstruction error (exactly 0).
+Only LL is split again. The same script writes `00_hero.png`, which runs the forward and inverse transforms on the 8-bit image and reports the maximum reconstruction error (exactly 0).
+
+![Image, pyramid and exact inverse](../figures/examples/00_hero.png)
 
 ## 3. Frequency tiling, seen on a zone plate
 
@@ -79,6 +83,22 @@ From [`python/rtl_model.py`](../python/rtl_model.py), a clock-by-clock replay of
 ## 11. Fixed-point ranges
 
 ![Fixed point](../figures/examples/11_fixed_point.png)
+
+## 12. Showcase: test images and coarse-to-fine synthesis
+
+![Banner](../figures/examples/00_banner.png)
+
+![Test images](../figures/examples/12_test_images.png)
+
+![Coarse to fine](../figures/examples/13_progressive.png)
+
+Colour images are transformed per RGB channel. Detail bands are drawn as light on black: brightness is the coefficient magnitude per channel (gamma 0.55, one robust scale per level), so edges glow in the colour of the change they encode. The percentages measure energy compaction on the luminance with synthesis-weighted coefficients ([theory §7](../docs/theory.md#7-normalisation-and-fair-comparison-of-coefficients)). The progressive figure inverts the colour pyramid with the finer detail bands zeroed; the final step is exact.
+
+## 13. The six schedules on one clock
+
+![Schedule animation](../figures/examples/14_schedules.gif)
+
+All six traces come from [`python/rtl_model.py`](../python/rtl_model.py) on the same 128 × 128 frame (TILE = 8), and the script asserts that each one is bit-exact with the integer oracle. Dim pixels are the intermediate frame `mid` of the two-pass schedules, bright pixels are finished coefficients, and the architecture's colour marks the newest writes. The footer shows the controller state at that clock. A static copy of the last frame is `figures/examples/14_schedules_final.png`.
 
 ## Your own images and the classic benchmark suite
 

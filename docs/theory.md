@@ -1,6 +1,6 @@
 # Theory: the CDF 5/3 wavelet and 2-D image decomposition
 
-**Author: Abdolvahab Khalili Sadaghiani**
+**Author: Abdolvahab Khalili Sadaghiani** · ORCID [0000-0003-4870-2768](https://orcid.org/0000-0003-4870-2768)
 
 This chapter derives everything the implementations rely on: the filters, the lifting factorisation, the 2-D separable structure, the frequency-domain picture, the basis functions, normalisation, boundaries and the exact integer arithmetic of the RTL. Each statement is checked by code in this repository; the figure or script that checks it is named next to it.
 

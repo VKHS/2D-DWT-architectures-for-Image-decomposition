@@ -76,6 +76,8 @@ class Trace:
     frame_reads: np.ndarray           # (H, W) logical reads of each pixel
     accesses: dict = field(default_factory=dict)  # store -> {"reads","writes"}
     peak_reads_per_clock: int = 0     # max distinct reads issued in one clock
+    mid_write_clock: np.ndarray = None  # (H, W) clock that wrote each mid word (-1: never)
+    states: list = field(default_factory=list)  # controller state of every compute clock
 
     @property
     def name(self) -> str:
@@ -92,7 +94,10 @@ class _Machine:
         self.mid = np.zeros_like(self.x)
         self.coeff = np.zeros_like(self.x)
         self.write_clock = np.full(self.x.shape, -1, dtype=np.int64)
+        self.mid_write_clock = np.full(self.x.shape, -1, dtype=np.int64)
         self.frame_reads = np.zeros(self.x.shape, dtype=np.int64)
+        self.state = "SEP"
+        self.states = []
         self.clock = 0
         self.acc = {}
         self.peak = 0
@@ -108,6 +113,7 @@ class _Machine:
         for store, _ in self._reads_this_clock:
             self._count(store, "reads")
         self._reads_this_clock = set()
+        self.states.append(self.state)
         self.clock += 1
 
     def read(self, store: str, addr, value):
@@ -136,13 +142,14 @@ class _Machine:
         self._count(store, "writes")
         if store == "mid":
             self.mid[r, c] = value
+            self.mid_write_clock[r, c] = self.clock + 1
         elif store == "coeff":
             self.coeff[r, c] = value
             self.write_clock[r, c] = self.clock + 1  # 1-based compute clock
 
     def trace(self) -> Trace:
         return Trace(self.arch, self.coeff, self.clock, self.write_clock,
-                     self.frame_reads, self.acc, self.peak)
+                     self.frame_reads, self.acc, self.peak, self.mid_write_clock, self.states)
 
 
 def _separable(m: _Machine):
@@ -199,6 +206,7 @@ def _emit_quartet(m: _Machine, y: int, xcol: int, get, pr: int, pc: int):
 
 def _direct(m: _Machine):
     """ARCH 2: state DIRECT, one quartet per clock, ox fastest."""
+    m.state = "DIRECT"
     for oy in range(m.h // 2):
         for ox in range(m.w // 2):
             # Every 5x5 position is fetched once per clock, as in the RTL.
@@ -215,6 +223,7 @@ def _line(m: _Machine):
     hh, ww = h // 2, w // 2
     linebuf = np.zeros((5, w), dtype=np.int64)
     for oy in range(hh):
+        m.state = "LINE_FILL"
         for lr in range(5):
             r = 2 * oy + lr - 2
             for ox in range(ww):
@@ -223,6 +232,7 @@ def _line(m: _Machine):
                 linebuf[lr, ox + ww] = hi8(v[2], v[3], v[4])
                 m._count("linebuf", "writes", 2)
                 m.tick()
+        m.state = "LINE_EMIT"
         for col in range(w):
             v = [m.read("linebuf", (lr, col), linebuf[lr, col]) for lr in range(5)]
             m.write("coeff", oy, col, lo8(*v))
@@ -239,6 +249,7 @@ def _tile(m: _Machine, tile: int):
     patch = np.zeros((p, p), dtype=np.int64)
     for ty in range(0, hh, tile):
         for tx in range(0, ww, tile):
+            m.state = "TILE_FILL"
             for py in range(p):
                 for px in range(p):
                     patch[py, px] = m.pix(2 * ty + py - 2, 2 * tx + px - 2)
@@ -247,6 +258,7 @@ def _tile(m: _Machine, tile: int):
 
             def get(r, c):
                 return m.read("patch", (r, c), patch[r, c])
+            m.state = "TILE_EMIT"
             for py in range(tile):
                 for px in range(tile):
                     for k in range(-2, 3):

@@ -1,19 +1,34 @@
-# 2-D DWT architectures for image decomposition
+![2-D DWT architectures for image decomposition: a rocket launch and its three-level CDF 5/3 pyramid](figures/examples/00_banner.png)
 
 [![CI](https://github.com/VKHS/2D-DWT-architectures-for-Image-decomposition/actions/workflows/ci.yml/badge.svg)](https://github.com/VKHS/2D-DWT-architectures-for-Image-decomposition/actions/workflows/ci.yml)
+[![ORCID](https://img.shields.io/badge/ORCID-0000--0003--4870--2768-A6CE39?logo=orcid&logoColor=white)](https://orcid.org/0000-0003-4870-2768)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2A78D6.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![MATLAB | Octave](https://img.shields.io/badge/MATLAB%20%7C%20Octave-no%20toolbox-EB6834)
+![Verilog](https://img.shields.io/badge/Verilog-6%20RTL%20schedules-1BAF7A)
 
-**Author: Abdolvahab Khalili Sadaghiani** · [authorship](AUTHOR.md) · [citation](CITATION.cff)
+**Abdolvahab Khalili Sadaghiani** · ORCID [0000-0003-4870-2768](https://orcid.org/0000-0003-4870-2768) · Department of Electrical Engineering, Linköping University · [authorship](AUTHOR.md) · [citation](CITATION.cff) · [MIT License](LICENSE)
 
 Six hardware schedules of the separable two-dimensional discrete wavelet transform (CDF 5/3 / LeGall 5/3), implemented in Python, MATLAB and parameterised Verilog, with an exact integer contract, a cycle-accurate model of the RTL and a complete illustrated handbook. All six schedules compute the same coefficients; they differ in the order of work, the storage they need and the memory traffic they generate. Those differences are what this repository measures and explains.
 
-![Image, three-level pyramid and exact reconstruction](figures/examples/00_hero.png)
+![Eight test images and their three-level pyramids](figures/examples/12_test_images.png)
+
+Every image above is split into a quarter-size approximation and three orientations of detail, three times over. Images with large smooth regions concentrate their energy in few coefficients: 99 % of it sits in 4.8 % of the coefficients for the CT phantom, 8.9 % for Cameraman and 9.6 % for Coffee. Fine texture spreads it out: 25.6 % for the cat's fur.
+
+![The six RTL schedules computing the same transform, clock by clock](figures/examples/14_schedules.gif)
+
+The same 128 × 128 frame passed through all six hardware schedules, replayed clock by clock from the RTL model on one shared clock. The direct 2-D engine finishes at 0.25 *N*, the row-column schedules fill an intermediate frame before writing any coefficient, the tiles appear block by block, and folded lifting takes 3 *N*. Every panel ends with the same bits.
+
+![Coarse-to-fine synthesis of a colour image](figures/examples/13_progressive.png)
+
+Run backwards, the pyramid rebuilds the image level by level, and the last level restores it exactly.
 
 **At a glance**
 
 - **One transform, six schedules:** row-column FIR, fused lifting, direct 2-D, five-row line buffer, halo-tiled 2-D and folded lifting. In floating point they agree to 1.1 × 10⁻¹⁵; in the RTL's integer arithmetic they are bit-identical.
 - **Exact integer contract:** no rounding anywhere. The output port carries 64 × the coefficient, and every band fits a 16-bit signed word (worst case HH = ±32,640).
 - **Cycle-accurate RTL model:** [`python/rtl_model.py`](python/rtl_model.py) replays `dwt53_frame.v` clock by clock. It is bit-exact with the integer oracle in 183 frame, architecture and tile runs, and every compute-clock count matches the closed-form schedule.
-- **Illustrated throughout:** 16 block diagrams and 12 computed figures from openly licensed images. Every figure is regenerated from code in this repository.
+- **Illustrated throughout:** 16 block diagrams, 15 computed figures and an animation, all from openly licensed or synthetic images and all regenerated from code in this repository.
 
 ## Contents
 
@@ -26,6 +41,7 @@ Six hardware schedules of the separable two-dimensional discrete wavelet transfo
 7. [Quick start](#7-quick-start)
 8. [Repository map](#8-repository-map)
 9. [References](#9-references)
+10. [License and image credits](#10-license-and-image-credits)
 
 ## 1. The transform
 
@@ -107,7 +123,7 @@ The full derivation is in [docs/theory.md](docs/theory.md): frequency responses,
 
 ![Dataflow fingerprints of the six RTL schedules](figures/examples/09_rtl_schedules.png)
 
-*[Example 9](examples/ex09_rtl_schedules.py).* Top row: when each output coefficient is written. Bottom row: how often each input pixel is read. The line buffer as implemented re-reads exactly like the direct 2-D engine (6.25 reads per pixel), because it refills all five rows for every group. A rotating buffer would bring it close to *N* clocks and 2.5 reads per pixel; [arch3](hardware/architectures/arch3.md) derives this.
+*[Example 9](examples/ex09_rtl_schedules.py)* (the static counterpart of the animation at the top). Top row: when each output coefficient is written. Bottom row: how often each input pixel is read. The line buffer as implemented re-reads exactly like the direct 2-D engine (6.25 reads per pixel), because it refills all five rows for every group. A rotating buffer would bring it close to *N* clocks and 2.5 reads per pixel; [arch3](hardware/architectures/arch3.md) derives this.
 
 ![Hardware cost model](figures/examples/10_hardware_costs.png)
 
@@ -195,7 +211,8 @@ Your own benchmark images, including classic test images you hold locally, go th
 | [`hardware/`](hardware/README.md) | Handbook: datapath, six chapters, performance, verification, worked example |
 | [`docs/`](docs) | [Theory](docs/theory.md) and [architecture cost model](docs/architecture.md) |
 | [`figures/diagrams/`](figures/diagrams) | Block diagrams (SVG) and their TikZ sources |
-| [`figures/examples/`](figures/examples) | Computed figures (PNG) |
+| [`figures/examples/`](figures/examples) | Computed figures (PNG) and the schedule animation (GIF) |
+| [`LICENSE`](LICENSE), [`CITATION.cff`](CITATION.cff), [`AUTHOR.md`](AUTHOR.md) | MIT License, citation metadata, authorship |
 
 ## 9. References
 
@@ -215,4 +232,22 @@ Your own benchmark images, including classic test images you hold locally, go th
 
 The six schedules follow the row-column, lifting, direct, line-based and block-based families of this literature. The code implements them from the equations above rather than reproducing any single paper's design.
 
-Images in the figures are scikit-image samples: Cameraman (Lav Varshney), Coffee (Rachel Michetti), Chelsea (Stefan van der Walt), brick and grass are CC0; the text image is in the public domain.
+## 10. License and image credits
+
+Code, documentation and figures are released under the [MIT License](LICENSE), © 2026 Abdolvahab Khalili Sadaghiani.
+
+The photographs used in the figures are scikit-image samples and keep their own terms:
+
+| Image | Source | Terms |
+|---|---|---|
+| Rocket launch | SpaceX | public domain |
+| Coffee | Rachel Michetti | CC0 |
+| Cat (Chelsea) | Stefan van der Walt | CC0 |
+| Cameraman | Lav Varshney | CC0 |
+| Retina (fundus photograph) | Wikimedia Commons | CC0 |
+| Brick | CC0Textures | CC0 |
+| Grass | linolafett (DeviantArt) | CC0 |
+| Greek coins | Brooklyn Museum | no known copyright restrictions |
+| Text | Wikipedia | public domain |
+
+The orientation test card, zone plate, Shepp–Logan phantom and Siemens star are synthetic and generated by the scripts.

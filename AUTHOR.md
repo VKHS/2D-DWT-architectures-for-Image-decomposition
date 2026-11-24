@@ -8,4 +8,4 @@ Abdolvahab Khalili Sadaghiani is the sole author and maintainer of this reposito
 
 The publications listed under [References](README.md#9-references) are prior work on which the architectures build. The sample photographs used in the figures belong to their photographers and are used under CC0 or as public-domain images, as credited in the README.
 
-To cite this work, use [CITATION.cff](CITATION.cff).
+The repository is released under the [MIT License](LICENSE). To cite this work, use [CITATION.cff](CITATION.cff).

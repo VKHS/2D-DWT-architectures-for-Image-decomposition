@@ -1,6 +1,6 @@
 # Hardware handbook
 
-**Author: Abdolvahab Khalili Sadaghiani**
+**Author: Abdolvahab Khalili Sadaghiani** · ORCID [0000-0003-4870-2768](https://orcid.org/0000-0003-4870-2768)
 
 [`rtl/dwt53_frame.v`](../rtl/dwt53_frame.v) is a parameterised, single-level Verilog reference of the 2-D CDF 5/3 DWT with six compute schedules. It loads an *H* × *W* frame of unsigned 8-bit pixels, computes exact signed Q6 coefficients with periodic boundaries, and drains them in packed row-major order. This handbook documents the interface, the arithmetic, every schedule and how all of it is verified.
 
