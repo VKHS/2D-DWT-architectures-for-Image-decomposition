@@ -1,0 +1,48 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Top level: \texttt{dwt53\_frame \#(H, W, ARCH, TILE)}};
+  \node[sub] at (0,-0.62) {Frame-buffered reference: load \var{N} = \var{H}·\var{W} pixels, compute one level with the schedule chosen by ARCH, drain \var{N} signed Q6 coefficients.};
+  % module boundary
+  \draw[draw=ink2, line width=1.1pt, rounded corners=6pt, fill=white] (2.3,-1.55) rectangle (19.7,-9.0);
+  \node[font=\bfseries\footnotesize, text=muted, anchor=north west] at (2.45,-1.62) {dwt53\_frame};
+  % ports
+  \foreach \p/\y/\d in {clk/-2.4/in, rst/-2.95/in, in\_valid/-4.2/in, in\_ready/-4.75/out, {in\_pixel [7:0]}/-5.3/in} {
+    \ifx\d\empty\fi
+    \node[font=\ttfamily\footnotesize, anchor=east] at (2.05,\y) {\p};
+  }
+  \draw[sig] (2.1,-2.4) -- (2.3,-2.4); \draw[sig] (2.1,-2.95) -- (2.3,-2.95);
+  \draw[sig] (2.1,-4.2) -- (2.3,-4.2); \draw[sig] (2.3,-4.75) -- (2.1,-4.75); \draw[bus] (2.1,-5.3) -- (2.3,-5.3);
+  \foreach \p/\y in {out\_valid/-4.2, out\_ready/-4.75, {out\_coeff [31:0]}/-5.3, {out\_index [31:0]}/-5.85, out\_last/-6.4}
+    \node[font=\ttfamily\footnotesize, anchor=west] at (19.95,\y) {\p};
+  \draw[sig] (19.7,-4.2) -- (19.9,-4.2); \draw[ctrl] (19.45,-7.55) -- (19.45,-4.2) -- (19.7,-4.2); \draw[sig] (19.9,-4.75) -- (19.7,-4.75);
+  \draw[bus] (19.7,-5.3) -- (19.9,-5.3); \draw[bus] (19.7,-5.85) -- (19.9,-5.85); \draw[sig] (19.7,-6.4) -- (19.9,-6.4);
+  % internals
+  \node[mem, minimum width=26mm, minimum height=15mm] (fr) at (4.6,-4.75) {\texttt{frame}\\\footnotesize \var{N} × 8 bit};
+  \draw[bus] (2.3,-5.3) -- (fr.west|-0,-5.3);
+  \node[draw=aluline, fill=alufill!50, rounded corners=4pt, line width=0.8pt, minimum width=60mm, minimum height=50mm] (eng) at (10.25,-4.75) {};
+  \node[font=\bfseries\footnotesize, anchor=north west] at ($(eng.north west)+(0.12,-0.1)$) {compute engine (one per build)};
+  \foreach \t/\s/\y in {{SEP: ARCH 0, 1, 5}/{\texttt{mid} \var{N} × 32}/-3.15, {DIRECT: ARCH 2}/{no extra array}/-4.15, {LINE: ARCH 3}/{\texttt{linebuf} 5\var{W} × 32}/-5.15, {TILE: ARCH 4}/{\texttt{patch} \var{P}² × 8}/-6.15} {
+    \node[alu, minimum width=33mm, minimum height=7.5mm, anchor=west, font=\footnotesize] at (7.45,\y) {\t};
+    \node[mem, minimum width=21mm, minimum height=7.5mm, anchor=west, font=\scriptsize] at (10.95,\y) {\s};
+  }
+  \draw[bus] (fr.east) -- (eng.west|-fr.east);
+  \node[mem, minimum width=24mm, minimum height=15mm] (co) at (15.05,-4.75) {\texttt{coeff}\\\footnotesize \var{N} × 32 bit};
+  \draw[bus] (eng.east|-co.west) -- (co.west);
+  \node[ctl, minimum width=22mm, minimum height=12mm, align=center] (om) at (18.0,-5.3) {output read\\\scriptsize \texttt{coeff[output\_idx]}};
+  \draw[bus] (co.east|-0,-5.3) -- (om.west);
+  \draw[bus] (om.east) -- (19.7,-5.3);
+  % control
+  \node[ctl, text width=158mm, align=center, anchor=north] (fsm) at (11.0,-7.55) {\textbf{controller}\quad LOAD → compute state(s) of the chosen ARCH → DRAIN → LOAD\\\footnotesize \texttt{input\_idx}, \texttt{output\_idx}, schedule counters, \texttt{wrap()} address units};
+  \draw[ctrl] (4.6,-7.55) -- (fr.south);
+  \draw[ctrl] (10.25,-7.55) -- (eng.south);
+  \draw[ctrl] (15.05,-7.55) -- (co.south);
+  \draw[ctrl] (18.0,-7.55) -- (om.south);
+  \draw[ctrl] (2.3,-4.2) -- (2.75,-4.2) -- (2.75,-7.55);
+  \draw[ctrl] (19.25,-7.55) -- (19.25,-4.75) -- (19.7,-4.75);
+  \node[note, anchor=north west, text width=24cm] at (0.2,-9.3) {%
+    \texttt{in\_ready} = (state = LOAD), \texttt{out\_valid} = (state = DRAIN), \texttt{out\_last} = \texttt{out\_valid} and (\texttt{output\_idx} = \var{N}−1). A held \texttt{out\_ready} = 0 keeps coefficient, index and last stable.
+    Compute starts on the clock after the last pixel; there is no overlap between LOAD, compute and DRAIN.};
+\end{tikzpicture}
+\end{document}

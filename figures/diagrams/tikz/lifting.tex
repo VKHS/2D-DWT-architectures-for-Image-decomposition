@@ -1,0 +1,71 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Lifting: the same CDF 5/3 in two in-place steps};
+  \node[sub] at (0,-0.62) {Split into even and odd samples, predict the odd ones, update the even ones. The inverse runs the same steps backwards with flipped signs.};
+  \def\yt{-2.55} \def\yb{-5.15} \def\ym{-3.85}
+  % ---------------- forward ----------------
+  \node[io, minimum width=12mm] (x) at (0.65,\ym) {\var{x}[\var{n}]};
+  \node[ctl, minimum height=34mm, minimum width=15mm, align=center] (split) at (2.65,\ym) {split\\[2pt]\footnotesize even\\\footnotesize odd};
+  \draw[sig] (x) -- (split);
+  \coordinate (et) at (split.east|-0,\yt);
+  \coordinate (ob) at (split.east|-0,\yb);
+  \def\px{5.75} \def\ux{9.35}
+  \node[dot] (de) at (\px,\yt) {};
+  \node[alu, minimum width=24mm] (P) at (\px,\ym) {Predict\\[1pt]\footnotesize −½ (1 + \var{z})};
+  \node[add] (ap) at (\px,\yb) {+};
+  \node[dot] (dd) at (\ux,\yb) {};
+  \node[alu, minimum width=24mm] (U) at (\ux,\ym) {Update\\[1pt]\footnotesize ¼ (1 + \var{z}⁻¹)};
+  \node[add] (au) at (\ux,\yt) {+};
+  \node[mem, minimum width=13mm] (s) at (11.95,\yt) {\var{s}[\var{n}]};
+  \node[mem, minimum width=13mm] (d) at (11.95,\yb) {\var{d}[\var{n}]};
+  \draw[nohead] (et) -- node[lbl, above=2pt, pos=0.5] {\var{e}[\var{n}] = \var{x}[2\var{n}]} (de);
+  \draw[sig] (de) -- (au);
+  \draw[sig] (ob) -- node[lbl, below=2pt, pos=0.56] {\var{o}[\var{n}] = \var{x}[2\var{n}+1]} (ap);
+  \draw[nohead] (ap) -- (dd);
+  \draw[sig] (dd) -- (d);
+  \draw[sig] (au) -- (s);
+  \draw[sig] (de) -- (P);
+  \draw[sig] (P) -- (ap);
+  \draw[sig] (dd) -- (U);
+  \draw[sig] (U) -- (au);
+  % ---------------- inverse ----------------
+  \def\iux{14.55} \def\ipx{18.15}
+  \node[dot] (id) at (\iux,\yb) {};
+  \node[alu, minimum width=24mm] (iU) at (\iux,\ym) {Undo update\\[1pt]\footnotesize −¼ (1 + \var{z}⁻¹)};
+  \node[add] (iu) at (\iux,\yt) {+};
+  \node[dot] (ie) at (\ipx,\yt) {};
+  \node[alu, minimum width=24mm] (iP) at (\ipx,\ym) {Undo predict\\[1pt]\footnotesize +½ (1 + \var{z})};
+  \node[add] (ip) at (\ipx,\yb) {+};
+  \node[ctl, minimum height=34mm, minimum width=15mm, align=center] (merge) at (20.75,\ym) {merge\\[2pt]\footnotesize even\\\footnotesize odd};
+  \node[io, minimum width=12mm] (y) at (22.75,\ym) {\var{x}[\var{n}]};
+  \draw[sig] (s) -- (iu);
+  \draw[nohead] (d) -- (id);
+  \draw[sig] (id) -- (ip);
+  \draw[nohead] (iu) -- node[lbl, above=2pt] {\var{e}[\var{n}]} (ie);
+  \draw[sig] (ie) -- (merge.west|-0,\yt);
+  \draw[sig] (ip) -- node[lbl, below=2pt] {\var{o}[\var{n}]} (merge.west|-0,\yb);
+  \draw[sig] (id) -- (iU);
+  \draw[sig] (iU) -- (iu);
+  \draw[sig] (ie) -- (iP);
+  \draw[sig] (iP) -- (ip);
+  \draw[sig] (merge) -- (y);
+  % groups
+  \begin{pgfonlayer}{groups}
+    \node[group, fit={(split)(P)(U)(au)(ap)($(split.north)+(0,3mm)$)}] (gf) {};
+    \node[group, fit={(iU)(iP)(merge)(iu)(ip)(id)($(merge.north)+(0,3mm)$)}] (gi) {};
+  \end{pgfonlayer}
+  \node[grouplabel] at (gf.north west) {FORWARD · PREDICT, THEN UPDATE};
+  \node[grouplabel] at (gi.north west) {INVERSE · UNDO UPDATE, THEN UNDO PREDICT};
+  % equations
+  \node[note, anchor=north west, text width=9.6cm] (eq1) at ($(gf.south west)+(0.05,-0.42)$) {%
+    \textbf{Predict}\quad \var{d}[\var{n}] = \var{o}[\var{n}] − ½ (\var{e}[\var{n}] + \var{e}[\var{n}+1])\\[2pt]
+    \textbf{Update}\quad \var{s}[\var{n}] = \var{e}[\var{n}] + ¼ (\var{d}[\var{n}−1] + \var{d}[\var{n}])\\[2pt]
+    Per output pair: 2 constant multiplications (shifts) and 4 additions,\\against 8 and 6 for the direct 5/3 FIR pair.};
+  \node[note, anchor=north west, text width=10.2cm] at ($(gi.south west)+(0.05,-0.42)$) {%
+    \textbf{RTL numerators, scale 8}\quad \texttt{dm = 2b − a − c},\; \texttt{dp = 2d − c − e}\\[2pt]
+    \texttt{L8 = 8c + dm + dp},\quad \texttt{H8 = 4·dp}\quad (\var{a}…\var{e} = \var{x}[2\var{n}−2 … 2\var{n}+2])\\[2pt]
+    Indices wrap periodically; each step is exactly invertible.};
+\end{tikzpicture}
+\end{document}

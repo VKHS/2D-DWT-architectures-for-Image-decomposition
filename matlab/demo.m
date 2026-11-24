@@ -1,4 +1,8 @@
 function demo(imagefile,levels)
+%DEMO  Compare the six schedules on an image (or a synthetic test pattern).
+%   DEMO(FILE, LEVELS) writes outputs/matlab_metrics.csv (runtime, maximum
+%   coefficient deviation from FIR, reconstruction RMSE) and
+%   outputs/matlab_comparison.png. DEMO([], 3) uses the built-in pattern.
 if nargin<2, levels=3; end
 if nargin<1 || isempty(imagefile)
     [j,i]=meshgrid(0:255);

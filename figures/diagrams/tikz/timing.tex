@@ -1,0 +1,40 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\usepackage{tikz-timing}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Frame protocol: ready/valid handshakes};
+  \node[sub] at (0,-0.62) {2 × 2 frame, ARCH 0: four pixels with one idle cycle, four compute clocks, four coefficients with one back-pressure stall.};
+  \def\sx{4.0}
+  \foreach \lab/\y/\seq in {
+      clk/-2.40/{30{C}},
+      in\_valid/-3.25/{4H 2L 4H 20L},
+      in\_ready/-4.10/{10H 18L 2H},
+      in\_pixel/-4.95/{2D{p₀} 2D{p₁} 2U 2D{p₂} 2D{p₃} 20U},
+      state/-5.80/{10D{LOAD} 8D{SEP: N compute clocks} 10D{DRAIN} 2D{LOAD}},
+      out\_valid/-6.65/{18L 10H 2L},
+      out\_ready/-7.50/{20H 2L 8H},
+      out\_coeff/-8.35/{18U 2D{c₀} 4D{c₁} 2D{c₂} 2D{c₃} 2U},
+      out\_index/-9.20/{18U 2D{0} 4D{1} 2D{2} 2D{3} 2U},
+      out\_last/-10.05/{26L 2H 2L}} {
+    \node[font=\ttfamily\footnotesize, anchor=east] at (\sx-0.25,\y+0.2) {\lab};
+    \begin{scope}[shift={(\sx,\y)}]
+      \timing[timing/xunit=4.6mm, timing/yunit=4.2mm, timing/slope=0.08, timing/d/text/.style={font=\scriptsize},
+              draw=wire, line width=0.75pt] at (0,0) {\seq};
+    \end{scope}
+  }
+  % cycle grid and annotations
+  \foreach \c in {0,...,15} \draw[hair, line width=0.4pt] (\sx+\c*0.92,-2.05) -- (\sx+\c*0.92,-10.2);
+  \tikzset{ann/.style={font=\footnotesize, text=ink2, align=center}}
+  \draw[accent, line width=1pt] (\sx+2*0.92,-3.1) rectangle ++(0.92,-0.75);
+  \node[ann, anchor=north] at (\sx+2.5*0.92,-10.45) {idle:\\\texttt{in\_valid} = 0};
+  \draw[accent, line width=1pt] (\sx+10*0.92,-7.35) rectangle ++(0.92,-1.95);
+  \node[ann, anchor=north] at (\sx+10.5*0.92,-10.45) {stall: \var{c}₁ and\\index held};
+  \draw[decorate, decoration={brace, amplitude=4pt}, draw=ink2] (\sx+5*0.92,-2.0) -- node[ann, above=5pt] {compute: \var{N} = 4 clocks} (\sx+9*0.92,-2.0);
+  \node[note, anchor=north west, text width=8.0cm] at (\sx+15.6*0.92,-2.45) {%
+    A transfer happens on a rising edge where valid and ready are both high.\\[4pt]
+    \texttt{in\_ready} is high only in LOAD; \texttt{out\_valid} only in DRAIN.\\[4pt]
+    \texttt{out\_index} is the packed row-major address, so the sink knows where each coefficient belongs; \texttt{out\_last} marks index \var{N}−1.\\[4pt]
+    The testbench drives the same pattern (an idle cycle every seventh pixel, a stall every fifth output cycle) on six frames per architecture.};
+\end{tikzpicture}
+\end{document}

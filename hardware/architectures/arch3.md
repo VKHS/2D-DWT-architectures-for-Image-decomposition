@@ -1,54 +1,42 @@
-# ARCH 3 — Five-row buffered FIR
+# ARCH 3 — Five-row line buffer
 
-**Compute: 7N/4 clocks · working store: 160W bits** (analytical; excludes frame I/O stalls).
+**Compute: 7*N*/4 clocks · working store: 160*W* bits (5*W* words) · 6.25 frame reads per pixel · 5 reads per clock**
 
-![Detailed architecture](../../figures/hardware/arch3_line_buffered.svg)
+![Line buffer](../../figures/diagrams/arch_line.svg)
 
-## 1. Dataflow and operating principle
+## Principle
 
-For each vertical coefficient row oy, five source rows r=wrap(2oy−2…2oy+2,H) are horizontally filtered. The LINE_FILL state visits slot lr=0…4 and horizontal pair ox=0…W/2−1. It writes low and high coefficients to linebuf[lr*W+ox] and linebuf[lr*W+ox+W/2]. LINE_EMIT then visits each of the W packed columns, reading the five slots and applying vertical low/high equations. It emits two coefficients per clock into output rows oy and oy+H/2. The controller resets lr and col_idx before proceeding to the next oy.
+For each output row pair *oy*, LINE_FILL filters the five source rows 2*oy*−2 … 2*oy*+2 (wrapped) horizontally into `linebuf`. Slot *lr* holds the low half in columns 0 … *W*/2−1 and the high half in *W*/2 … *W*−1. LINE_EMIT then visits all *W* packed columns: it reads the five slots, applies the vertical pair and writes output rows *oy* and *oy* + *H*/2.
 
-## 2. Processing element and physical organization
+## RTL mapping (states LINE_FILL, LINE_EMIT)
 
-![07 line buffer](../../figures/hardware/07_line_buffer.svg)
+- LINE_FILL: `linebuf[lr*W+ox] <= lo8(pix(2*oy+lr-2, 2*ox-2), …)` and `linebuf[lr*W+ox+WW] <= hi8(…)`; `ox` advances fastest, then `lr`.
+- LINE_EMIT: `coeff[oy*W+col_idx] <= lo8(linebuf[col_idx], linebuf[W+col_idx], …)` and the high pair into row `oy + H/2`.
+- After the last column, `oy` advances and the controller returns to LINE_FILL, or enters DRAIN after the last group.
 
-![03 fir pe](../../figures/hardware/03_fir_pe.svg)
+## Schedule
 
-## 3. RTL mapping
+| Stage (per output row pair) | Clocks |
+|---|---:|
+| fill 5 slots × *W*/2 pairs | 5*W*/2 |
+| emit *W* columns | *W* |
+| × *H*/2 groups | 7*N*/4 total |
 
-- LINE_FILL uses pix(), lo8(), hi8(); ox advances fastest, then lr.
-- LINE_EMIT uses col_idx and linebuf[lr*W+col_idx] for the vertical pair.
-- On the last column of a group, oy increments or state becomes DRAIN.
-- The present implementation refills all five slots per group, even though adjacent source neighborhoods overlap.
+## Memory and ports
 
-Source: [dwt53_frame.v](../../rtl/dwt53_frame.v); inspect the corresponding controller branch and helper functions. The blocks are logical schematic groupings, not a claim that the top instantiates separate Verilog modules for every block.
+The intermediate store shrinks from *N* to 5*W* words (10 KiB instead of 1 MiB at 512 × 512). The RTL refills all five slots for every group, though consecutive groups share three source rows: each source row is filtered 2.5 times on average, and frame traffic is 6.25 reads per pixel, the same as the direct engine ([fingerprints](../../figures/examples/09_rtl_schedules.png)).
 
-## 4. Controller schedule
+## Rotating buffer: the measured improvement
 
-| Stage | Clocks / handshakes |
-|---|---|
-| LOAD | N input handshakes |
-| FILL | 5W/2 clocks |
-| EMIT | W clocks |
-| REPEAT | H/2 groups |
-| DRAIN | N output handshakes |
+Keep the three shared rows with a circular slot pointer and filter only the two new rows per group:
 
-For output row oy, cached source rows are wrap(2oy−2 … 2oy+2,H).
+| | RTL as implemented | Rotating buffer |
+|---|---:|---:|
+| clocks per group | 5*W*/2 + *W* | *W* + *W* |
+| compute clocks per frame | 7*N*/4 | about *N* |
+| frame reads per pixel | 6.25 | about 2.5 |
+| buffer | 5*W* words | 5*W* words |
 
-Vertical PE reads one packed column from all five row slots; writes low and high output rows.
+With periodic boundaries, the first group needs rows *H*−2 and *H*−1 and the last group needs row 0 again, so a streaming version adds a short prologue and epilogue (or keeps a copy of row 0's filtered result). Overlapping fill and emission with dual-ported slots would hide the fill entirely.
 
-Current RTL refills all five rows for every group. A rotating cache retaining 3 rows is an optimization, not this RTL.
-
-## 5. Memory ports and implementation cost
-
-The intermediate footprint is 5W signed words instead of HW; it is smaller only for H>5. The frame and output stores remain. Per fill clock, five raw samples are logically accessed and two packed row coefficients written. Per emit clock, five row-slot values are read and two output coefficients written. A real rotating buffer could assign a separate bank per row and reuse the three overlap rows.
-
-## 6. Numerical behavior and validation
-
-No intermediate truncation is used. A final signed coefficient is 64 times the floating-point reference. The [worked example](../worked_example.md) gives a numerical input, full packed output, and per-architecture trace. Run `make test` from the repository root to compare this architecture and all other variants against the independent integer oracle. The simulation commands are provided, not evidence of a completed simulation run.
-
-## 7. Production FPGA optimization
-
-Keep tags or a modulo slot pointer for the five rows, reuse three overlapping source rows, and load only two new rows per interior output-row group. For a genuinely streaming input, periodic wrap creates dependencies on the end of the image: specify how the first and last row groups are retained or replayed. Double-buffer or schedule horizontal and vertical work with explicit bank and port arbitration.
-
-[Compare all six architectures](README.md) · [Performance model](../performance.md) · [Hardware handbook](../README.md)
+[All chapters](README.md) · [Performance](../performance.md) · [Handbook](../README.md)

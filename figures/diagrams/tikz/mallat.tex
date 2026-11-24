@@ -1,0 +1,42 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Multilevel (Mallat) decomposition};
+  \node[sub] at (0,-0.62) {Each level re-decomposes only the LL band. Three levels give ten bands packed in place in one \var{H} × \var{W} array.};
+  % chain ---------------------------------------------------------------
+  \def\cy{-2.55}
+  \node[io, minimum width=16mm] (x) at (0.95,\cy) {\var{x}\\\footnotesize \var{H} × \var{W}};
+  \node[alu, minimum width=19mm, minimum height=13mm] (l1) at (3.75,\cy) {2-D DWT\\\footnotesize level 1};
+  \node[mem, minimum width=14mm] (ll1) at (6.45,\cy) {LL₁\\\footnotesize \var{H}/2 × \var{W}/2};
+  \node[alu, minimum width=19mm, minimum height=13mm] (l2) at (9.15,\cy) {2-D DWT\\\footnotesize level 2};
+  \node[mem, minimum width=14mm] (ll2) at (11.85,\cy) {LL₂\\\footnotesize \var{H}/4 × \var{W}/4};
+  \node[alu, minimum width=19mm, minimum height=13mm] (l3) at (14.55,\cy) {2-D DWT\\\footnotesize level 3};
+  \node[mem, minimum width=14mm] (ll3) at (17.25,\cy) {LL₃\\\footnotesize \var{H}/8 × \var{W}/8};
+  \foreach \a/\b in {x/l1, l1/ll1, ll1/l2, l2/ll2, ll2/l3, l3/ll3} \draw[sig] (\a) -- (\b);
+  \foreach \l/\j/\s in {l1/1/2, l2/2/4, l3/3/8} {
+    \node[mem, minimum width=33mm, minimum height=7.5mm, below=7mm of \l, font=\footnotesize] (d\j) {LH\usub{\j} · HL\usub{\j} · HH\usub{\j}};
+    \draw[sig] (\l) -- (d\j);
+    \node[note, below=0.8mm of d\j] {each \var{H}/\s{} × \var{W}/\s};
+  }
+  % packed map ---------------------------------------------------------
+  \def\M{6.0} \def\ox{19.6} \def\oy{-1.35}
+  \tikzset{band/.style={draw=surface, line width=1.6pt, font=\footnotesize, align=center}}
+  \fill[memfill] (\ox,\oy) rectangle ++(\M,-\M);
+  \foreach \j/\f in {1/1, 2/0.5, 3/0.25} {
+    \pgfmathsetmacro{\h}{\M*\f/2}
+    \node[band, fill=negfill, minimum width=\h cm, minimum height=\h cm, anchor=north west, inner sep=0pt] at (\ox+\h,\oy) {LH\usub{\j}};
+    \node[band, fill=accentfill, minimum width=\h cm, minimum height=\h cm, anchor=north west, inner sep=0pt] at (\ox,\oy-\h) {HL\usub{\j}};
+    \node[band, fill=alufill, minimum width=\h cm, minimum height=\h cm, anchor=north west, inner sep=0pt] at (\ox+\h,\oy-\h) {HH\usub{\j}};
+  }
+  \node[band, fill=zerofill, minimum width=0.75cm, minimum height=0.75cm, anchor=north west, inner sep=0pt, font=\scriptsize] at (\ox,\oy) {LL₃};
+  \draw[hair, line width=0.6pt] (\ox,\oy) rectangle ++(\M,-\M);
+  \node[head, anchor=south west] at (\ox,\oy+0.12) {Packed output, row-major};
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}, draw=ink2] (\ox,\oy-\M-0.12) -- node[note, below=5pt] {\var{W}} ++(\M,0);
+  % notes ----------------------------------------------------------------
+  \node[note, anchor=north west, text width=17.8cm] at (0.2,-6.35) {%
+    Work per level falls by 4: the pyramid touches \var{HW}(1 + ¼ + ¹⁄₁₆) samples for three levels, less than 4\var{HW}/3 for any depth.
+    The coefficient count stays \var{H}\var{W}, so a \var{J}-level pyramid is an in-place rewrite of one frame buffer.
+    The RTL computes one level; deeper pyramids feed LL back through the same engine.};
+\end{tikzpicture}
+\end{document}

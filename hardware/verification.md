@@ -1,36 +1,42 @@
-# Verification and FPGA deployment guide
+# Verification and deployment
 
-## Functional regression
+**Author: Abdolvahab Khalili Sadaghiani**
 
-From the repository root, install requirements and Icarus Verilog, then run:
+## Four independent checks
+
+| Check | Command | What it compares |
+|---|---|---|
+| Software schedules | `python python/test_dwt.py` | all six methods against the row-column FIR (random, constant and impulse arrays, 2 × 2 to 64 × 64, 1–3 levels, tile size 3) and perfect reconstruction |
+| Integer oracle | `python hardware/golden.py` | independent outer-product Q6 masks against 64 × each software method on six test frames |
+| RTL schedules | `python python/rtl_model.py --check` | a clock-by-clock replay of every RTL state: bit-exact against the oracle and clock counts against the formulas (9 sizes, all ARCH, all valid TILE) |
+| RTL simulation | `make test` | Icarus Verilog runs `tb/tb_dwt53.v` for ARCH 0–5 |
+
+The testbench drives six frames per architecture: zero, full scale, a border impulse, a checkerboard, a ramp, and random pixels (or your image with `IMAGE=`). It inserts an idle input cycle every seventh pixel and holds `out_ready` low every fifth output cycle. It checks every coefficient, every `out_index` and `out_last`, prints the compute clocks per frame, and fails on any mismatch or timeout.
 
 ```sh
-make test
-make test H=4 W=4 TILE=1
+make test                                   # 8 x 12, TILE 2
+make test H=4 W=4 TILE=1                    # the worked example size
 make test H=16 W=16 TILE=4
-make test H=32 W=32 TILE=4 IMAGE=benchmarks/Lena.png
+make test H=32 W=32 TILE=4 IMAGE=benchmarks/Cameraman.png
 ```
 
-The Python golden model independently computes four outer-product masks and checks exact coefficient equality against all six software implementations. The testbench compares every RTL coefficient, index and final marker, exercises six frames and uses deterministic input gaps and output stalls. A mismatch or timeout is fatal. Test patterns include zero, maximum constant, boundary impulse, checkerboard, ramp and seeded random or a local image. The simulator must actually be run to establish RTL correctness.
+The [CI workflow](../.github/workflows/ci.yml) runs the software checks, the RTL model sweep, `make test` for two frame sizes and the MATLAB `test_all` (under Octave) on every push.
 
-## Physical implementation
-
-The existing Vivado script synthesizes a selected architecture and reports estimated timing and utilization. Use a modest H/W at first: the reference arrays expose many asynchronous reads and multiple writes, so large frame dimensions can create large multiplexers and distributed storage rather than inferred BRAM.
+## Synthesis
 
 ```sh
 vivado -mode batch -source scripts/synth_vivado.tcl \
   -tclargs xcve2302-sfva784-1LP-e-S 0 16 16 4 5.0
 ```
 
-The 5 ns period is a requested constraint, not a measured frequency. For actual deployment add a board-specific clock/reset and memory interface, perform implementation, inspect WNS/TNS, verify clock-domain assumptions and run board-level coefficient checks. No post-route or board measurements are included.
+The arguments are part, ARCH, H, W, TILE and the clock period in ns. The script writes post-synthesis utilisation and timing reports to `build/vivado_arch_<ARCH>/`. Start with small frames: the reference arrays have several reads per clock, which synthesis maps to distributed memory or replicated RAM.
 
-## Recommended next validation gates
+## Gates before hardware deployment
 
-1. Run Python and RTL regression across the dimensions above; archive logs.
-2. Verify reset mid-frame, prolonged backpressure and repeated frames.
-3. Inspect inferred storage and arithmetic for each architecture; compare utilization at the same parameter values.
-4. Add explicit banked memory and registered compute stages if the target frequency or area is missed.
-5. Repeat bit-true testing after every microarchitectural change.
-6. Compare post-route timing, throughput and measured power under common workloads.
+1. Software, model and RTL regressions pass for the target dimensions.
+2. Mid-frame reset, long back-pressure and back-to-back frames are simulated.
+3. Inferred memories and arithmetic are inspected per ARCH at identical parameters.
+4. Banked memories and registered stages are added where timing or area requires it, and the full regression is repeated after every change.
+5. Post-route timing, utilisation, throughput and power are measured under a common workload on the board.
 
-Image input support is documented in [the benchmark guide](../examples/README.md).
+Benchmark images: [examples/README.md](../examples/README.md#your-own-images-and-the-classic-benchmark-suite).

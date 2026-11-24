@@ -1,4 +1,7 @@
 function y=idwt2_arch(c,levels)
+%IDWT2_ARCH  Inverse of DWT2_ARCH (any method; they share the coefficients).
+%   X = IDWT2_ARCH(C, LEVELS) undoes LEVELS levels of the packed periodic
+%   CDF 5/3 decomposition C by inverse lifting (undo update, undo predict).
 if nargin<2, levels=1; end
 assert(ismatrix(c) && levels>=1 && fix(levels)==levels && all(size(c)>=2^levels) && all(mod(size(c),2^levels)==0));
 y=double(c); [h,w]=size(y);

@@ -1,52 +1,31 @@
-# ARCH 2 — Direct four-band 2-D FIR
+# ARCH 2 — Direct 2-D (outer-product masks)
 
-**Compute: N/4 clocks · no full intermediate store** (analytical; excludes frame I/O stalls).
+**Compute: *N*/4 clocks · no intermediate array · 6.25 frame reads per pixel · 25 reads per clock**
 
-![Detailed architecture](../../figures/hardware/arch2_direct_2d.svg)
+![Direct 2-D masks](../../figures/diagrams/pe_direct2d.svg)
 
-## 1. Dataflow and operating principle
+## Principle
 
-Rather than generating a separable intermediate frame, direct_band() evaluates a 5×5 outer product for each output band. Let L=[−1,2,6,2,−1], H=[0,0,−4,8,−4]. At output location (i,j), use a window centered at raw coordinates (2i,2j). The four masks are LᵀL, LᵀH, HᵀL, HᵀH, where the first vector is vertical. Each sum is already scaled by 64. Four coefficients are written in one clock to four quadrant addresses.
+No intermediate frame at all. For output position (*i*, *j*) the engine reads the 5 × 5 window centred on (2*i*, 2*j*) and evaluates four masks at once: LL, LH, HL and HH, the outer products of the numerator taps **L** = [−1, 2, 6, 2, −1] and **H** = [0, 0, −4, 8, −4]. Each sum is already scaled by 64, and the four results go to the four quadrant addresses in the same clock.
 
-## 2. Processing element and physical organization
+## RTL mapping (state DIRECT)
 
-![06 outer product masks](../../figures/hardware/06_outer_product_masks.svg)
+- `direct_band(r, c, vb, hb, use_patch)` loops over the 5 × 5 window with constant bounds; `weight(band, k)` supplies the taps.
+- `emit_direct(oy, ox, 2*oy, 2*ox, 0)` writes `coeff` at (*oy*, *ox*), (*oy*, *ox* + *W*/2), (*oy* + *H*/2, *ox*) and (*oy* + *H*/2, *ox* + *W*/2).
+- `ox` advances fastest, then `oy`; the last quartet enters DRAIN.
 
-![02 memory layout](../../figures/hardware/02_memory_layout.svg)
+## Schedule and memory
 
-## 3. RTL mapping
+One quartet per clock, *N*/4 clocks. Each clock reads 25 distinct pixels (fewer on frames smaller than 6 × 6, where wrapped addresses coincide). Neighbouring windows overlap, so every pixel is fetched 6.25 times per frame, the highest frame traffic of the six. The four masks have 25 + 15 + 15 + 9 = 64 non-zero weights.
 
-- DIRECT invokes emit_direct(oy,ox,2*oy,2*ox,0).
-- direct_band() runs two constant-bound loops over offsets −2…2, reading pix() and multiplying by weight(vb,k)*weight(hb,l).
-- emit_direct() writes four non-overlapping quadrant addresses.
-- ox advances within a coefficient row, oy advances between rows.
+## Where it fits and how to improve it
 
-Source: [dwt53_frame.v](../../rtl/dwt53_frame.v); inspect the corresponding controller branch and helper functions. The blocks are logical schematic groupings, not a claim that the top instantiates separate Verilog modules for every block.
+The lowest clock count and no intermediate storage, paid for with read bandwidth and a wide combinational reduction that limits the clock frequency. Improvements:
 
-## 4. Controller schedule
+- a shared window register file fed by line storage, so each pixel is read once;
+- the factorised window: 5 vertical pairs on the window columns, then 2 horizontal pairs, which gives the same quartet with 7 pair evaluations instead of 64 terms;
+- balanced, registered adder trees and independent banks for the four output quadrants.
 
-| Stage | Clocks / handshakes |
-|---|---|
-| LOAD | N input handshakes |
-| DIRECT | N/4 clocks |
-| DRAIN | N output handshakes |
+Compare against the separable engines at equal measured throughput, not equal clock count.
 
-Each clock emits a complete LL/LH/HL/HH quartet at the same decimated location.
-
-All masks share one conceptual neighborhood; the RTL functions may duplicate read logic before synthesis.
-
-The direct path requires 25 distinct logical window positions and four writes; banked memory is a design task.
-
-## 5. Memory ports and implementation cost
-
-A quartet has 25 distinct window positions for images at least 6×6 (periodic aliasing may reduce distinct addresses on small frames). The four masks have 25,15,15,9 nonzero terms; naïve evaluation is 64 weighted terms. The RTL repeats function calls for each band and may replicate memory/mux logic. There is no explicit balanced reduction tree, DSP allocation or shared window register bank.
-
-## 6. Numerical behavior and validation
-
-No intermediate truncation is used. A final signed coefficient is 64 times the floating-point reference. The [worked example](../worked_example.md) gives a numerical input, full packed output, and per-architecture trace. Run `make test` from the repository root to compare this architecture and all other variants against the independent integer oracle. The simulation commands are provided, not evidence of a completed simulation run.
-
-## 7. Production FPGA optimization
-
-Use a shared 5×5 window generator backed by line storage, precompute constant-weight shifts, and implement balanced registered reduction trees. Bank the four output subbands independently. Measure routing and fanout, not just nominal multiply counts. Compare against separable engines at equal measured throughput.
-
-[Compare all six architectures](README.md) · [Performance model](../performance.md) · [Hardware handbook](../README.md)
+[All chapters](README.md) · [Performance](../performance.md) · [Handbook](../README.md)

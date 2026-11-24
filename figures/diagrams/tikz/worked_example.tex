@@ -1,0 +1,41 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Bit-true worked example (4 × 4)};
+  \node[sub] at (0,-0.62) {Integer numerators exactly as the RTL computes them: scale 8 after the row pass, 64 after the column pass. Periodic indices wrap at every border.};
+  \tikzset{mx/.style={matrix of nodes, nodes={minimum width=11.5mm, minimum height=7mm, font=\small, anchor=center},
+            column sep=-\pgflinewidth, row sep=-\pgflinewidth, inner sep=0pt},
+           cell/.style={draw=surface, line width=1pt}}
+  \matrix[mx, nodes={cell, fill=memfill}, anchor=north west] (A) at (0.2,-2.0) {
+    10 & 20 & 30 & 40 \\ 50 & 60 & 70 & 80 \\ 90 & 100 & 110 & 120 \\ 130 & 140 & 150 & 160 \\};
+  \node[head, anchor=south west] at ($(A.north west)+(0,0.12)$) {Input \var{x} (8-bit)};
+  \matrix[mx, nodes={cell, fill=memfill}, anchor=north west] (B) at (7.0,-2.0) {
+    120 & 280 & |[fill=negfill]| 0 & |[fill=negfill]| 160 \\ 440 & 600 & |[fill=negfill]| 0 & |[fill=negfill]| 160 \\
+    760 & 920 & |[fill=negfill]| 0 & |[fill=negfill]| 160 \\ 1080 & 1240 & |[fill=negfill]| 0 & |[fill=negfill]| 160 \\};
+  \node[head, anchor=south west] at ($(B.north west)+(0,0.12)$) {After the row pass, ×8  [L | H]};
+  \matrix[mx, nodes={cell, fill=memfill}, anchor=north west] (C) at (13.8,-2.0) {
+    2240 & 3520 & |[fill=negfill]| 0 & |[fill=negfill]| 1280 \\ 7360 & 8640 & |[fill=negfill]| 0 & |[fill=negfill]| 1280 \\
+    |[fill=accentfill]| 0 & |[fill=accentfill]| 0 & |[fill=alufill]| 0 & |[fill=alufill]| 0 \\ |[fill=accentfill]| 5120 & |[fill=accentfill]| 5120 & |[fill=alufill]| 0 & |[fill=alufill]| 0 \\};
+  \node[head, anchor=south west] at ($(C.north west)+(0,0.12)$) {Packed output, ×64  [LL LH; HL HH]};
+  \draw[bus] ($(A.east)+(0.25,0)$) -- node[note, above, align=center] {rows:\\L8, H8} ($(B.west)+(-0.25,0)$);
+  \draw[bus] ($(B.east)+(0.25,0)$) -- node[note, above, align=center] {columns:\\L8, H8} ($(C.west)+(-0.25,0)$);
+  % highlight windows
+  \draw[accent, line width=1.6pt, rounded corners=2pt] (A-1-1.north west) rectangle (A-1-2.south east);
+  \draw[accent, line width=1.6pt, rounded corners=2pt, dashed] (A-1-3.north west) rectangle (A-1-4.south east);
+  \draw[accent, line width=1.6pt, rounded corners=2pt] (B-1-1.north west) rectangle (B-1-1.south east);
+  \draw[regline, line width=1.6pt, rounded corners=2pt] (B-1-1.north west) rectangle (B-4-1.south east);
+  \draw[regline, line width=1.6pt, rounded corners=2pt] (C-1-1.north west) rectangle (C-1-1.south east);
+  % equations
+  \node[note, anchor=north west, text width=12.6cm] at (0.2,-5.35) {%
+    \textbf{\color{accent}Row 0, pair 0.} Window \var{a}…\var{e} = \var{x}[0, −2…2] = 30, 40, 10, 20, 30 (the dashed cells are the wrapped neighbours):\\
+    \texttt{L8 = −30 + 2·40 + 6·10 + 2·20 − 30 = 120}\qquad \texttt{H8 = 4·(2·20 − 10 − 30) = 0}\\
+    Lifting gives the same: \texttt{dm = 80 − 30 − 10 = 40}, \texttt{dp = 40 − 10 − 30 = 0}, \texttt{L8 = 8·10 + 40 + 0 = 120}.\\[5pt]
+    \textbf{Row 0, pair 1.} Window 10, 20, 30, 40, 10:\quad \texttt{L8 = 280}, \texttt{H8 = 4·(80 − 30 − 10) = 160}.};
+  \node[note, anchor=north west, text width=12.2cm] at (13.2,-5.35) {%
+    \textbf{\color{regline}Column 0, pair 0.} Window = rows 2, 3, 0, 1, 2 of the first packed column = 760, 1080, 120, 440, 760:\\
+    \texttt{L8 = −760 + 2·1080 + 6·120 + 2·440 − 760 = 2240}\\
+    \texttt{H8 = 4·(2·440 − 120 − 760) = 0}\\[5pt]
+    Dividing by 64 gives the floating-point coefficients: LL = [35 55; 115 135], LH = [0 20; 0 20], HL = [0 0; 80 80], HH = 0. The output port emits 2240 first (index 0) and 0 last (index 15).};
+\end{tikzpicture}
+\end{document}

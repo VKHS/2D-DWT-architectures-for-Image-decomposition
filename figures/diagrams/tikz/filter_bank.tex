@@ -1,0 +1,60 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas, node distance=6mm and 7mm]
+  \node[ttl] at (0,0) {Two-channel CDF 5/3 filter bank};
+  \node[sub] at (0,-0.62) {One dimension. Analysis splits \var{x} into a half-rate approximation \var{s} and detail \var{d}; synthesis rebuilds \var{x} exactly.};
+
+  % analysis -----------------------------------------------------------
+  \node[io, minimum width=13mm] (x) at (0.6,-3.75) {\var{x}[\var{n}]};
+  \coordinate (sp) at ($(x.east)+(6mm,0)$);
+  \node[alu, minimum width=17mm] (h0) at ($(sp)+(17mm,1.25)$) {\var{H}₀(\var{z})};
+  \node[alu, minimum width=17mm] (h1) at ($(sp)+(17mm,-1.25)$) {\var{H}₁(\var{z})};
+  \node[dn, right=6mm of h0] (d0) {↓2};
+  \node[dn, right=6mm of h1] (d1) {↓2};
+  \node[mem, right=7mm of d0, minimum width=14mm] (s) {\var{s}[\var{n}]};
+  \node[mem, right=7mm of d1, minimum width=14mm] (d) {\var{d}[\var{n}]};
+  \draw[nohead] (x.east) -- (sp);
+  \node[dot] at (sp) {};
+  \draw[sig] (sp) |- (h0.west);
+  \draw[sig] (sp) |- (h1.west);
+  \draw[sig] (h0) -- (d0);
+  \draw[sig] (h1) -- (d1);
+  \draw[sig] (d0) -- (s);
+  \draw[sig] (d1) -- (d);
+  \node[note, below=1.2mm of h0, align=center] {−⅛ \;¼\; ¾\; ¼\; −⅛};
+  \node[note, below=1.2mm of h1, align=center] {−½ \;\;1\; −½};
+
+  % synthesis ----------------------------------------------------------
+  \node[dn, right=9mm of s] (u0) {↑2};
+  \node[dn, right=9mm of d] (u1) {↑2};
+  \node[alu, right=6mm of u0, minimum width=17mm] (g0) {\var{G}₀(\var{z})};
+  \node[alu, right=6mm of u1, minimum width=17mm] (g1) {\var{G}₁(\var{z})};
+  \node[add] (sum) at ($(g0.east)!0.5!(g1.east)+(9mm,0)$) {+};
+  \node[io, right=7mm of sum, minimum width=20mm] (y) {\var{x}[\var{n}] \,exact};
+  \draw[sig] (s) -- (u0);
+  \draw[sig] (d) -- (u1);
+  \draw[sig] (u0) -- (g0);
+  \draw[sig] (u1) -- (g1);
+  \draw[sig] (g0.east) -| (sum.north);
+  \draw[sig] (g1.east) -| (sum.south);
+  \draw[sig] (sum) -- (y);
+  \node[note, below=1.2mm of g0, align=center] {½ \;\;1\;\; ½};
+  \node[note, below=1.2mm of g1, align=center] {−⅛\; −¼\; ¾\; −¼\; −⅛};
+
+  % groups --------------------------------------------------------------
+  \begin{pgfonlayer}{groups}
+    \node[group, fit={(h0)(h1)(d0)(d1)($(h1.south)+(0,-5mm)$)}] (ga) {};
+    \node[group, fit={(u0)(u1)(g0)(g1)(sum)($(g1.south)+(0,-5mm)$)}] (gs) {};
+  \end{pgfonlayer}
+  \node[grouplabel] at (ga.north west) {ANALYSIS · FORWARD DWT};
+  \node[grouplabel] at (gs.north west) {SYNTHESIS · INVERSE DWT};
+  \node[note, anchor=north, align=center] at ($(s.south)!0.5!(d.north)$) {subbands\\at half rate};
+
+  % footnotes ------------------------------------------------------------
+  \node[note, anchor=north west, text width=17.6cm] at ($(x.west|-ga.south)+(0,-4mm)$) {%
+    Taps are listed from offset −2 (low-pass) or 0 (high-pass) in this repository's convention; \var{H}₀ has DC gain 1 and \var{H}₁ has Nyquist gain 2.
+    Perfect reconstruction: the synthesis pair cancels the aliasing introduced by ↓2 and returns \var{x} with no delay and no distortion.
+    The 2-D transform applies this pair along rows, then along columns.};
+\end{tikzpicture}
+\end{document}

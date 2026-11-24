@@ -1,0 +1,8 @@
+% Five-sample window column drawn on the left of the PE diagrams.
+\newcommand{\samplewindow}[2]{% #1 = x position, #2 = top y
+  \foreach \n/\l [count=\i from 0] in {a/{\var{x}[2\var{j}−2]}, b/{\var{x}[2\var{j}−1]}, c/{\var{x}[2\var{j}]}, d/{\var{x}[2\var{j}+1]}, e/{\var{x}[2\var{j}+2]}} {
+    \node[mem, minimum width=30mm, minimum height=7mm, anchor=north west, rounded corners=0pt] (w\n) at (#1,#2-0.7*\i) {\textbf{\n}\;=\;\l};
+  }
+  \node[head, anchor=south west] at ($(wa.north west)+(0,1.2mm)$) {Sample window};
+  \node[note, anchor=north west, text width=3.0cm] at ($(we.south west)+(0,-1.5mm)$) {periodic indices; pair \var{j} of a row or column};
+}

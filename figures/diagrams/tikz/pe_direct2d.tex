@@ -1,0 +1,50 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Direct 2-D engine: four outer-product masks (ARCH 2 and 4)};
+  \node[sub] at (0,-0.62) {A 5 × 5 window centred on (2\var{i}, 2\var{j}) produces all four coefficients of one quartet in one clock; each mask = vertical taps × horizontal taps, scale 64.};
+  % window
+  \def\c{0.62}
+  \begin{scope}[shift={(0.2,-1.95)}]
+    \node[head, anchor=south west] at (0,0.12) {Input window};
+    \foreach \r in {0,...,4} \foreach \q in {0,...,4} {
+      \pgfmathtruncatemacro{\dr}{\r-2} \pgfmathtruncatemacro{\dq}{\q-2}
+      \draw[memline, fill=memfill, line width=0.6pt] (\q*\c,-\r*\c) rectangle ++(\c,-\c);
+    }
+    \draw[memline, line width=1.4pt] (2*\c,-2*\c) rectangle ++(\c,-\c);
+    \node[font=\tiny, text=ink2] at (2.5*\c,-2.5*\c) {2\var{i},2\var{j}};
+    \node[note, anchor=north west, text width=3.3cm] at (0,-5*\c-0.2) {rows 2\var{i}−2…2\var{i}+2, columns 2\var{j}−2…2\var{j}+2, wrapped};
+    \coordinate (wout) at (5*\c+0.05,-2.5*\c);
+  \end{scope}
+  % masks
+  \def\L{{-1,2,6,2,-1}} \def\Hh{{0,0,-4,8,-4}}
+  \newcommand{\maskgrid}[4]{% #1 x, #2 name, #3 vertical vector, #4 horizontal vector
+    \begin{scope}[shift={(#1,-1.95)}]
+      \node[head, anchor=south west] at (0,0.12) {#2};
+      \foreach \r in {0,...,4} \foreach \q in {0,...,4} {
+        \pgfmathtruncatemacro{\v}{#3[\r]*#4[\q]}
+        \ifnum\v>0 \def\fc{posfill}\else\ifnum\v<0 \def\fc{negfill}\else\def\fc{zerofill}\fi\fi
+        \draw[surface, line width=1pt, fill=\fc] (\q*\c,-\r*\c) rectangle ++(\c,-\c);
+        \ifnum\v=0 \node[font=\tiny, text=muted] at (\q*\c+0.5*\c,-\r*\c-0.5*\c) {0};
+        \else \node[font=\scriptsize] at (\q*\c+0.5*\c,-\r*\c-0.5*\c) {\v}; \fi
+      }
+    \end{scope}}
+  \maskgrid{5.0}{LL\quad 25 terms}{\L}{\L}
+  \maskgrid{8.6}{LH\quad 15 terms}{\L}{\Hh}
+  \maskgrid{12.2}{HL\quad 15 terms}{\Hh}{\L}
+  \maskgrid{15.8}{HH\quad 9 terms}{\Hh}{\Hh}
+  \draw[bus] (wout) -- (4.75,-3.5);
+  % outputs
+  \foreach \x/\b/\a in {5.0/LL/{(\var{i}, \var{j})}, 8.6/LH/{(\var{i}, \var{j}+\var{W}/2)}, 12.2/HL/{(\var{i}+\var{H}/2, \var{j})}, 15.8/HH/{(\var{i}+\var{H}/2, \var{j}+\var{W}/2)}} {
+    \node[alu, minimum width=32mm, anchor=north] (s\b) at (\x+1.55,-5.45) {Σ weighted terms};
+    \node[mem, text width=30mm, align=center, anchor=north, font=\footnotesize] (o\b) at (\x+1.55,-6.75) {\b\; at \a};
+    \draw[sig] (s\b) -- (o\b);
+    \draw[sig] (\x+1.55,-5.05) -- (s\b);
+  }
+  \node[note, anchor=north west, text width=24.5cm] at (0.2,-8.0) {%
+    \textbf{Masks} are the numerator outer products of \texttt{L = [−1, 2, 6, 2, −1]} and \texttt{H = [0, 0, −4, 8, −4]} (offsets −2…2); red positive, blue negative. 64 weighted terms per quartet, 16\var{HW} for the frame.\\[3pt]
+    \textbf{ARCH 2} reads the window from the global frame (25 reads per clock, \var{N}/4 clocks). \textbf{ARCH 4} first copies a (2\var{T}+3)² halo patch and reads the same window locally.\\[3pt]
+    \textbf{Factorised alternative:} 5 vertical pairs (one per window column) followed by 2 horizontal pairs give the same quartet with 7 pair elements instead of 64 terms.};
+\end{tikzpicture}
+\end{document}

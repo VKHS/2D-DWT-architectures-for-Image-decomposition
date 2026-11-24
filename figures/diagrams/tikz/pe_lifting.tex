@@ -1,0 +1,72 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\input{window_macro.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Fused lifting processing element (ARCH 1)};
+  \node[sub] at (0,-0.62) {Two predictions and the update in one clock. Bit-identical to the FIR element; the shared prediction \texttt{dp} feeds both outputs.};
+  \samplewindow{0.2}{-1.9}
+  \def\X{5.0}
+  % predict previous pair: dm = 2b - (a + c)
+  \node[net] (pa) at (\X,-2.0) {a};
+  \node[net] (pc) at (\X,-2.9) {c};
+  \node[net] (pb) at (\X,-3.8) {b};
+  \node[add] (ac) at (\X+1.4,-2.45) {+};
+  \node[shf] (b1) at (\X+1.4,-3.8) {<<1};
+  \node[add] (dm) at (\X+2.75,-3.125) {+};
+  \draw[sig] (pa.east) -| (ac.north);
+  \draw[sig] (pc.east) -| (ac.south);
+  \draw[sig] (pb) -- (b1);
+  \draw[sig] (ac.east) -| (dm.north);
+  \draw[sig] (b1.east) -| (dm.south);
+  \node[font=\footnotesize\bfseries, text=pos] at ($(dm.north)+(-0.22,0.22)$) {−};
+  % predict this pair: dp = 2d - (c + e)
+  \node[net] (qc) at (\X,-5.7) {c};
+  \node[net] (qe) at (\X,-6.6) {e};
+  \node[net] (qd) at (\X,-7.5) {d};
+  \node[add] (ce) at (\X+1.4,-6.15) {+};
+  \node[shf] (d1) at (\X+1.4,-7.5) {<<1};
+  \node[add] (dp) at (\X+2.75,-6.825) {+};
+  \draw[sig] (qc.east) -| (ce.north);
+  \draw[sig] (qe.east) -| (ce.south);
+  \draw[sig] (qd) -- (d1);
+  \draw[sig] (ce.east) -| (dp.north);
+  \draw[sig] (d1.east) -| (dp.south);
+  \node[font=\footnotesize\bfseries, text=pos] at ($(dp.north)+(-0.22,0.22)$) {−};
+  % update column
+  \node[net] (uc) at (\X+4.15,-4.75) {c};
+  \node[shf] (c3) at (\X+5.0,-4.75) {<<3};
+  \node[add] (u1) at (\X+6.1,-3.95) {+};
+  \node[add] (u2) at (\X+7.3,-5.35) {+};
+  \node[shf] (h2) at (\X+8.35,-6.825) {<<2};
+  \node[mem, minimum width=19mm] (L8) at (\X+10.1,-5.35) {\texttt{low8}};
+  \node[mem, minimum width=19mm] (H8) at (\X+10.1,-6.825) {\texttt{high8}};
+  \draw[sig] (uc) -- (c3);
+  \draw[sig] (dm.east) -| node[lbl, pos=0.2, above] {\texttt{dm}} (u1.north);
+  \draw[sig] (c3.east) -| node[lbl, pos=0.3, below] {8\var{c}} (u1.south);
+  \draw[sig] (u1.east) -| (u2.north);
+  \draw[nohead] (dp.east) -- node[lbl, above, pos=0.3] {\texttt{dp}} (\X+7.3,-6.825) coordinate (dpd);
+  \node[dot] at (dpd) {};
+  \draw[sig] (dpd) -- (u2.south);
+  \draw[sig] (dpd) -- (h2);
+  \draw[sig] (u2) -- (L8);
+  \draw[sig] (h2) -- (H8);
+  \begin{pgfonlayer}{groups}
+    \node[group, fit={(pa)(pb)(dm)}] (g1) {};
+    \node[group, fit={(qc)(qd)(dp)}] (g2) {};
+    \node[group, fit={(uc)(c3)(u1)(u2)}, fill=regfill!35] (g3) {};
+  \end{pgfonlayer}
+  \node[grouplabel] at (g1.north west) {PREDICT · PREVIOUS PAIR · dm = 2b − a − c};
+  \node[grouplabel, anchor=north west] at (g2.south west) {PREDICT · THIS PAIR · dp = 2d − c − e};
+  \node[grouplabel, anchor=north west] at (g3.south west) {UPDATE · 8c + dm + dp};
+  \node[note, anchor=north west, text width=7.2cm] at (\X+11.75,-1.85) {%
+    \textbf{Lifting with integer numerators}\\[2pt]
+    \texttt{dm\; = 2b − a − c}\; = 2\var{d}[\var{j}−1]\\
+    \texttt{dp\; = 2d − c − e}\; = 2\var{d}[\var{j}]\\
+    \texttt{low8 = 8c + dm + dp}\; = 8\var{s}[\var{j}]\\
+    \texttt{high8 = 4·dp}\; = 8\var{d}[\var{j}]\\[6pt]
+    \textbf{Cost per pair}\\[2pt]
+    6 adders. A streaming engine can carry this pair's \texttt{dp} forward as the next pair's \texttt{dm}, leaving 4 adders and 2 new samples per pair.\\[6pt]
+    \textbf{RTL}\quad \texttt{pred2()} in \texttt{dwt53\_frame.v};\\ standalone module \texttt{dwt53\_lift\_pair}.};
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,71 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\input{window_macro.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Folded lifting processing element (ARCH 5)};
+  \node[sub] at (0,-0.62) {One predictor shared over three clocks: phase 0 computes \texttt{dp}, phase 1 computes \texttt{dm}, phase 2 updates and writes the pair.};
+  \samplewindow{0.2}{-2.0}
+  \def\X{5.0}
+  \node[net] (m1a) at (\X,-2.3) {a};
+  \node[net] (m1b) at (\X,-2.85) {b};
+  \node[net] (m1c) at (\X,-3.4) {c};
+  \node[net] (m0c) at (\X,-4.35) {c};
+  \node[net] (m0d) at (\X,-4.9) {d};
+  \node[net] (m0e) at (\X,-5.45) {e};
+  % operand multiplexer (drawn explicitly)
+  \draw[draw=ctlline, fill=ctlfill, line width=0.8pt] (\X+1.0,-2.0) -- (\X+1.85,-2.75) -- (\X+1.85,-5.0) -- (\X+1.0,-5.75) -- cycle;
+  \coordinate (mxo) at (\X+1.85,-3.875);
+  \node[font=\scriptsize, text=ink2] at (\X+1.35,-2.85) {1};
+  \node[font=\scriptsize, text=ink2] at (\X+1.35,-4.9) {0};
+  \node[font=\scriptsize, text=ink2, rotate=90] at (\X+1.4,-3.875) {mux};
+  \foreach \n in {m1a,m1b,m1c,m0c,m0d,m0e} \draw[sig] (\n.east) -- (\n.east-|{\X+1.0,0});
+  \node[alu, minimum width=30mm, minimum height=16mm] (pred) at (\X+4.75,-3.875) {predictor\\[2pt]\texttt{2·o − e₀ − e₁}};
+  \draw[bus] (mxo) -- node[lbl, above=1pt] {\var{e}₀,\,\var{o},\,\var{e}₁} (pred.west);
+  \node[reg, minimum width=24mm] (rd) at (\X+8.1,-2.85) {\texttt{saved\_d}};
+  \node[reg, minimum width=24mm] (rp) at (\X+8.1,-4.9) {\texttt{saved\_prev}};
+  \clk{rd} \clk{rp}
+  \draw[nohead] (pred.east) -- ++(0.6,0) coordinate (pj);
+  \node[dot] at (pj) {};
+  \draw[sig] (pj) |- (rd.west);
+  \draw[sig] (pj) |- (rp.west);
+  % control stubs (net-label style)
+  \tikzset{cnet/.style={draw=ctlline, fill=ctlfill, rounded corners=1.5pt, font=\scriptsize, inner xsep=3pt, inner ysep=1.5pt}}
+  \node[cnet, anchor=north] (sel) at (\X+1.43,-6.15) {sel = (phase = 1)};
+  \draw[ctrl] (sel.north) -- (\X+1.43,-5.43);
+  \node[cnet, anchor=north] (en0) at ($(rd.south)+(0,-0.42)$) {load: phase = 0};
+  \draw[ctrl] (en0.north) -- (rd.south);
+  \node[cnet, anchor=north] (en1) at ($(rp.south)+(0,-0.42)$) {load: phase = 1};
+  \draw[ctrl] (en1.north) -- (rp.south);
+  % update
+  \node[net] (uc) at (\X+10.2,-6.3) {c};
+  \node[shf] (c3) at (\X+11.1,-6.3) {<<3};
+  \node[add] (u1) at (\X+11.1,-3.875) {+};
+  \node[add] (u2) at (\X+12.3,-5.05) {+};
+  \node[shf] (h2) at (\X+11.1,-2.1) {<<2};
+  \draw[sig] (rd.east) -| (u1.north);
+  \draw[sig] (rp.east) -| (u1.south);
+  \draw[sig] (uc) -- (c3);
+  \draw[sig] (c3.east) -| (u2.south);
+  \draw[sig] (u1.east) -| (u2.north);
+  \coordinate (rdj) at ($(rd.east)+(0.4,0)$);
+  \node[dot] at (rdj) {};
+  \draw[sig] (rdj) |- (h2.west);
+  \node[mem, minimum width=26mm] (L8) at (\X+14.45,-5.05) {\texttt{low8}\\[-1pt]\scriptsize written at phase 2};
+  \node[mem, minimum width=26mm] (H8) at (\X+14.45,-2.1) {\texttt{high8}\\[-1pt]\scriptsize written at phase 2};
+  \draw[sig] (u2) -- (L8);
+  \draw[sig] (h2) -- (H8);
+  \node[ctl, minimum width=36mm, anchor=north west] (ph) at (\X+2.75,-6.35) {phase counter 0 → 1 → 2 → 0\\[1pt]\footnotesize drives sel, loads and the pair write};
+  \node[cnet, anchor=north] (we) at ($(L8.south)+(0,-0.42)$) {write + advance: phase = 2};
+  \draw[ctrl] (we.north) -- (L8.south);
+  % timing strip
+  \def\ty{-8.35}
+  \node[head, anchor=west] at (0.2,\ty+0.62) {Three clocks per output pair};
+  \foreach \i/\p/\m/\r/\w in {0/0/{c, d, e}/{\texttt{saved\_d ← dp}}/{—}, 1/1/{a, b, c}/{\texttt{saved\_prev ← dm}}/{—}, 2/2/{c (centre)}/{—}/{\texttt{low8}, \texttt{high8} written}} {
+    \node[draw=hair, fill=white, text width=49mm, minimum height=17mm, anchor=north west, align=left, font=\footnotesize, inner sep=5pt]
+      at (0.2+\i*5.45,\ty) {\textbf{clock \var{t}+\i}\quad phase \p\\operands: \m\\register: \r\\memory: \w};
+  }
+  \node[note, anchor=north west, text width=8.6cm] at (16.7,\ty) {%
+    3 clocks and 7 sample reads per pair (ARCH 0/1: 1 clock, 5 reads); at most 3 reads per clock, the lowest port pressure of the six. Column-first: pass 0 is vertical, pass 1 horizontal; compute = 3\var{N} clocks.};
+\end{tikzpicture}
+\end{document}

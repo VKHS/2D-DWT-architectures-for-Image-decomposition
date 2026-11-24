@@ -1,49 +1,82 @@
 # Bit-true worked example
 
-**Project author and maintainer: Abdolvahab Khalili Sadaghiani (VKHS).**
+**Author: Abdolvahab Khalili Sadaghiani**
 
-The following 4×4 unsigned image is small enough to trace every operation by hand. Values are computed from the numerator taps; they are not simulator output.
+A 4 × 4 frame, small enough to follow every operation. All numbers below are produced by [`hardware/golden.py`](golden.py) and by [`python/rtl_model.py`](../python/rtl_model.py) for every ARCH.
+
+![Worked example](../figures/diagrams/worked_example.svg)
 
 ## Input
-```
-     10      20      30      40
-     50      60      70      80
-     90     100     110     120
-    130     140     150     160
-```
 
-The first row at j=0 uses a=30, b=40, c=10, d=20, e=30 due to periodic wrapping. L8=−30+80+60+40−30=120. H8=4(40−10−30)=0. The lifting prediction dm=80−30−10=40, dp=40−10−30=0; L8=80+40+0=120. At j=1, the low numerator is 200 and the high numerator is 160.
-
-## Horizontal intermediate (scale ×8)
 ```
-    120     280       0     160
-    440     600       0     160
-    760     920       0     160
-   1080    1240       0     160
+ 10   20   30   40
+ 50   60   70   80
+ 90  100  110  120
+130  140  150  160
 ```
 
-For the first packed column, the five vertical inputs at i=0 are 760,1080,120,440,760. L8=2560; H8=0. The resulting scale is ×64.
+## Row pass (scale 8)
 
-## Final packed output (scale ×64)
-```
-   2240    3520       0    1280
-   7360    8640       0    1280
-      0       0       0       0
-   5120    5120       0       0
-```
+Row 0, pair 0 is centred on column 0. With periodic wrap the window is *x*[0, −2…2] = 30, 40, 10, 20, 30:
 
-## Normalized coefficients
 ```
-     35      55       0      20
-    115     135       0      20
-      0       0       0       0
-     80      80       0       0
+L8 = -30 + 2*40 + 6*10 + 2*20 - 30 = 120
+H8 = 4 * (2*20 - 10 - 30)          = 0
 ```
 
-LL is top-left, LH top-right, HL bottom-left and HH bottom-right. The output port emits the signed numerator in row-major order; output index 0 therefore holds 2240. Negative coefficients, if present, are represented in signed two's complement.
+Lifting gives the same values: `dm = 2*40 - 30 - 10 = 40`, `dp = 2*20 - 10 - 30 = 0`, `L8 = 8*10 + 40 + 0 = 120`.
 
-## Controller trace for all six
+Row 0, pair 1 (window 10, 20, 30, 40, 10): `L8 = -10 + 40 + 180 + 80 - 10 = 280`, `H8 = 4 * (80 - 30 - 10) = 160`.
 
-For N=16, T=1 (tile variant), ARCH 0 and 1 each execute 8 horizontal and 8 vertical pair clocks; ARCH 2 emits 4 quartets; ARCH 3 fills 10 pair clocks and emits 4 vertical pairs for each of two groups (28 clocks total); ARCH 4 fills 25 samples and emits one quartet per tile, repeating four times (104 clocks); ARCH 5 performs 8 vertical pairs and 8 horizontal pairs, each in three clocks (48 clocks). All add 16 input and 16 output handshakes in a stall-free frame.
+Packed intermediate `[L | H]`:
 
-The first row's two pairs demonstrate periodic boundary handling. The tile variant uses identical global boundary coordinates before copying a local patch. Run `make test H=4 W=4 TILE=1` to test the general 4×4 configuration; the existing testbench generates its own six input frames, not this particular worked matrix.
+```
+ 120   280     0   160
+ 440   600     0   160
+ 760   920     0   160
+1080  1240     0   160
+```
+
+## Column pass (scale 64)
+
+The first packed column, pair 0, reads rows 2, 3, 0, 1, 2 = 760, 1080, 120, 440, 760:
+
+```
+L8 = -760 + 2*1080 + 6*120 + 2*440 - 760 = 2240
+H8 = 4 * (2*440 - 120 - 760)             = 0
+```
+
+Packed output `[LL LH; HL HH]`, scale 64:
+
+```
+2240  3520     0  1280
+7360  8640     0  1280
+   0     0     0     0
+5120  5120     0     0
+```
+
+Divided by 64:
+
+```
+ 35   55    0   20
+115  135    0   20
+  0    0    0    0
+ 80   80    0    0
+```
+
+The output port emits 2240 first (`out_index` 0) and 0 last (`out_index` 15). Negative coefficients, when present, are two's complement.
+
+## Controller trace for all six schedules
+
+For *N* = 16 and TILE = 1:
+
+| ARCH | Compute clocks | Breakdown |
+|---:|---:|---|
+| 0 | 16 | 8 row pairs + 8 column pairs |
+| 1 | 16 | same order, lifting element |
+| 2 | 4 | 4 quartets |
+| 3 | 28 | 2 groups × (10 fill + 4 emit) |
+| 4 | 104 | 4 tiles × (25 fill + 1 emit) |
+| 5 | 48 | 8 column pairs + 8 row pairs, 3 clocks each |
+
+LOAD and DRAIN add 16 handshakes each when nothing stalls. `make test H=4 W=4 TILE=1` simulates this configuration; the testbench drives its own six frames rather than this particular matrix, and the RTL model reproduces the matrix above for every ARCH.

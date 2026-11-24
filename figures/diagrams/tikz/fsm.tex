@@ -1,0 +1,42 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Controller state machine};
+  \node[sub] at (0,-0.62) {One frame at a time; the compute branch is fixed at elaboration by ARCH. Synchronous \texttt{rst} returns to LOAD from any state.};
+  \tikzset{st/.style={ctl, rounded corners=7pt, minimum width=31mm, minimum height=12mm, align=center},
+           io2/.style={mem, rounded corners=7pt, minimum width=36mm, minimum height=12mm, align=center},
+           tr/.style={sig, draw=ink2}, tl/.style={font=\footnotesize, text=ink2, fill=surface, inner sep=1.5pt}}
+  \node[io2] (load) at (11.0,-2.3) {\textbf{LOAD}\\\footnotesize \texttt{in\_ready} = 1 · \var{N} handshakes};
+  \node[st] (sep) at (2.6,-5.3) {\textbf{SEP}\\\footnotesize ARCH 0, 1, 5};
+  \node[st] (dir) at (8.0,-5.3) {\textbf{DIRECT}\\\footnotesize ARCH 2};
+  \node[st] (lf) at (13.4,-5.3) {\textbf{LINE\_FILL}\\\footnotesize ARCH 3};
+  \node[st] (tf) at (20.2,-5.3) {\textbf{TILE\_FILL}\\\footnotesize ARCH 4};
+  \node[st] (le) at (13.4,-8.0) {\textbf{LINE\_EMIT}};
+  \node[st] (te) at (20.2,-8.0) {\textbf{TILE\_EMIT}};
+  \node[io2] (drain) at (11.0,-10.6) {\textbf{DRAIN}\\\footnotesize \texttt{out\_valid} = 1 · \var{N} handshakes};
+  \coordinate (fan) at (11.0,-3.55);
+  \draw[nohead, draw=ink2] (load.south) -- (fan);
+  \node[tl, anchor=west] at ($(fan)+(0.1,0.25)$) {last pixel accepted};
+  \foreach \s in {sep,dir,lf,tf} \draw[tr] (fan) -| (\s.north);
+  \draw[tr] (sep.west) to[out=200, in=160, looseness=4] node[tl, left] {next pair} (sep.south west);
+  \draw[tr] (dir.west) to[out=200, in=160, looseness=4] node[tl, left] {next quartet} (dir.south west);
+  \draw[tr] ($(lf.south)+(-0.4,0)$) -- node[tl, left] {lr = 4, last ox} ($(le.north)+(-0.4,0)$);
+  \draw[tr] ($(le.north)+(0.4,0)$) -- node[tl, right] {last column, next oy} ($(lf.south)+(0.4,0)$);
+  \draw[tr] ($(tf.south)+(-0.4,0)$) -- node[tl, left] {patch loaded} ($(te.north)+(-0.4,0)$);
+  \draw[tr] ($(te.north)+(0.4,0)$) -- node[tl, right] {next tile} ($(tf.south)+(0.4,0)$);
+  \draw[tr] (sep.south) |- node[tl, pos=0.25, left] {last pair of pass 1} ($(drain.west)+(0,0.2)$);
+  \draw[tr] (dir.south) |- node[tl, pos=0.35, left] {last quartet} ($(drain.west)+(0,-0.2)$);
+  \draw[tr] (le.south) -- node[tl, right, pos=0.4] {last group} ($(drain.north)+(1.0,0)$) ;
+  \draw[tr] (te.south) |- node[tl, pos=0.25, right] {last tile} (drain.east);
+  \draw[tr] (drain.south) -- ++(0,-0.55) -| node[tl, pos=0.25, below] {last coefficient accepted} ($(load.west)+(-11.0,0)$) -- (load.west);
+  \node[note, anchor=north west, text width=8.4cm] at (23.0,-2.0) {%
+    \textbf{Compute clocks} (\var{N} = \var{H}·\var{W}, \var{P} = 2\var{T}+3)\\[3pt]
+    SEP: \var{N} (ARCH 0, 1), 3\var{N} (ARCH 5)\\
+    DIRECT: \var{N}/4\\
+    LINE: (\var{H}/2)(5\var{W}/2 + \var{W}) = 7\var{N}/4\\
+    TILE: \var{N}(\var{P}² + \var{T}²)/(4\var{T}²)\\[5pt]
+    LOAD and DRAIN add \var{N} handshakes each, plus any stall cycles from \texttt{in\_valid} or \texttt{out\_ready}.\\[5pt]
+    Counts are verified clock by clock by \texttt{python/rtl\_model.py} for every ARCH, size and tile.};
+\end{tikzpicture}
+\end{document}

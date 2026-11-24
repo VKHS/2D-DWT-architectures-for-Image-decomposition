@@ -1,39 +1,60 @@
-# Common hardware datapath, arithmetic and interface
+# Datapath, arithmetic and interface
 
-**Project author and maintainer: Abdolvahab Khalili Sadaghiani (VKHS).**
+**Author: Abdolvahab Khalili Sadaghiani**
 
-![Top-level hardware](../figures/hardware/01_top_level.svg)
+## Processing elements
+
+Every schedule is built from one of three processing elements. All take the same five-sample window *a*…*e* = *x*[2*j*−2 … 2*j*+2] (periodic indices) and produce the same two numerators.
+
+![FIR pair element](../figures/diagrams/pe_fir.svg)
+
+The FIR element uses symmetric pre-adders (*a*+*e*, *b*+*d*) and builds 6*c* as 4*c* + 2*c*: 7 adders and no multipliers. RTL: `lo8()`, `hi8()`; standalone module `dwt53_fir_pair`.
+
+![Fused lifting element](../figures/diagrams/pe_lifting.svg)
+
+The lifting element computes both predictions and the update in one clock: 6 adders, with `dp` shared by both outputs. RTL: `pred2()`; standalone module `dwt53_lift_pair`.
+
+![Folded lifting element](../figures/diagrams/pe_folded.svg)
+
+The folded element time-multiplexes one predictor over three phases and holds the two predictions in registers: 3 clocks per pair, at most 3 sample reads per clock.
 
 ## Fixed-point representation
 
-The filter is the unrounded, periodically extended CDF 5/3. For each pair, use five consecutive samples centered on an even coordinate. The low numerator is −a+2b+6c+2d−e, and the high numerator is 4(2d−c−e). The first pass has scale 8; the second has scale 64. Right-shifting intermediate values would change the transform and invalidate equivalence with the floating-point software.
+The first pass has scale 8, the second scale 64. Right-shifting an intermediate value would change the transform and break equivalence with the floating-point software, so the reference keeps full numerators. Exact ranges for 8-bit input:
 
-![FIR arithmetic](../figures/hardware/03_fir_pe.svg)
+| Signal | Range | Signed width |
+|---|---|---:|
+| `low8` (pass 1) | −510 … 2,550 | 13 |
+| `high8` (pass 1) | −2,040 … 2,040 | 12 |
+| final LL | −10,200 … 26,520 | 16 |
+| final LH, HL | −24,480 … 24,480 | 16 |
+| final HH | −32,640 … 32,640 | 16 |
 
-![Lifting arithmetic](../figures/hardware/04_lifting_pe.svg)
+When narrowing words, sign-extend operands before shifts and additions. This is the unrounded 5/3 transform, not the JPEG 2000 reversible (rounded) variant; [theory §9](../docs/theory.md#9-exact-integer-arithmetic-the-rtl-contract) compares the two.
 
-The absolute sum of either numerator tap vector is at most 16. For 8-bit unsigned input the conservative intermediate magnitude is 4080 (signed 13 bits), and final magnitude is 65280 (signed 17 bits). The implementation uses signed 32-bit words. In narrowing a design, sign-extend operands before shifts and additions and retain sufficient temporary widths. No arbitrary floating-point conversion is required: interpretation is numerator/64. This is not the rounded JPEG 2000 reversible transform.
+![Fixed-point ranges](../figures/examples/11_fixed_point.png)
 
 ## Address generation and packed bands
 
-![Memory layout](../figures/hardware/02_memory_layout.svg)
+Pair *j* of a row or column reads wrapped offsets −2…+2 around 2*j*. The RTL `wrap(k, n)` takes the remainder and adds *n* when it is negative. For power-of-two dimensions this reduces to bit masking; otherwise wrap counters are cheaper than a modulo unit.
 
-Each pair uses wrapped offsets −2…+2. For coordinate (i,j) in coefficient space, the four output addresses are iW+j, iW+j+W/2, (i+H/2)W+j and (i+H/2)W+j+W/2. Horizontal and vertical passes commute because arithmetic is exact. At a boundary, wrap(k,n)=((k mod n)+n) mod n; the RTL uses a remainder plus a negative correction. Modulo with constant power-of-two dimensions can simplify; arbitrary dimensions may require additional address logic.
+Coefficient (*i*, *j*) of each band lives at:
+
+| Band | Address |
+|---|---|
+| LL | *iW* + *j* |
+| LH | *iW* + *j* + *W*/2 |
+| HL | (*i* + *H*/2)*W* + *j* |
+| HH | (*i* + *H*/2)*W* + *j* + *W*/2 |
+
+Horizontal pair writes go to (*r*, *j*) and (*r*, *j* + *W*/2); vertical pair writes go to (*i*, *c*) and (*i* + *H*/2, *c*). Because the arithmetic is exact, the two passes commute, so ARCH 5 can run the column pass first.
+
+![Two-pass datapath](../figures/diagrams/arch_separable.svg)
 
 ## Controller
 
-![State machine](../figures/hardware/05_controller_fsm.svg)
+![State machine](../figures/diagrams/fsm.svg)
 
-At a rising edge, an input is accepted only when in_valid and in_ready are both high. In LOAD, each handshake writes one pixel; input_idx advances only on an accepted pixel. After N input handshakes the compile-time architecture determines the next state. During computation both external transfers are inactive. In DRAIN, each accepted output advances output_idx; a stall keeps the index, coefficient and last indication stable. Reset is synchronous and aborts the frame. No AXI4-Stream wrapper, frame-start signal or concurrent input/output stage is present.
+In LOAD, each accepted pixel is written to `frame[input_idx]`. After the *N*-th handshake the controller enters the compute state of the chosen ARCH on the next clock; both external handshakes are idle during computation. In DRAIN, each accepted coefficient advances `output_idx`; a stall holds coefficient, index and `out_last`. A new frame starts after the last coefficient transfers. Reset is synchronous and returns to LOAD from any state.
 
-| Port | Width | Interpretation |
-|---|---:|---|
-| clk, rst | 1 each | Rising-edge clock, active-high synchronous reset |
-| in_valid, in_ready | 1 each | Input handshake |
-| in_pixel | 8 | Unsigned input |
-| out_valid, out_ready | 1 each | Output handshake |
-| out_coeff | 32 | Signed numerator, scale 64 |
-| out_index | 32 | Packed row-major index |
-| out_last | 1 | Final coefficient, qualified by out_valid |
-
-See the [six architecture chapters](architectures/README.md), [worked example](worked_example.md) and [RTL source](../rtl/dwt53_frame.v).
+See the [six architecture chapters](architectures/README.md), the [worked example](worked_example.md) and the [RTL source](../rtl/dwt53_frame.v).

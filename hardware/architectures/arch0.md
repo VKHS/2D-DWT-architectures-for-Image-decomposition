@@ -1,53 +1,35 @@
 # ARCH 0 — Row-column FIR
 
-**Compute: N clocks · working store: 32N bits** (analytical; excludes frame I/O stalls).
+**Compute: *N* clocks · working store: 32*N* bits · 2.50 frame reads per pixel · 5 reads per clock**
 
-![Detailed architecture](../../figures/hardware/arch0_row_column.svg)
+![Two-pass datapath](../../figures/diagrams/arch_separable.svg)
 
-## 1. Dataflow and operating principle
+## Principle
 
-The horizontal pass treats each row as an independent 1-D signal. For pair index j, it reads five globally wrapped source samples at columns 2j−2 through 2j+2. It computes L8 and H8 in parallel and writes them into the left and right halves of mid. After H×W/2 pair writes, pass_no flips to one. In the vertical pass, each packed column of mid is filtered along rows; the low and high outputs go to the top and bottom halves of coeff. The result is LL/LH/HL/HH without a software transpose. The hardware traverses columns through addresses rather than copying a transposed array.
+The textbook schedule. Pass 0 treats every row as a 1-D signal: for pair *j* it reads the five wrapped samples at columns 2*j*−2 … 2*j*+2, computes `low8` and `high8` in the [FIR element](../../figures/diagrams/pe_fir.svg) and writes them to the left and right halves of `mid`. Pass 1 filters every packed column of `mid` the same way and writes the top and bottom halves of `coeff`. The column pass walks `mid` with stride *W* through the address generator, so no transposed copy is made.
 
-## 2. Processing element and physical organization
+## RTL mapping (`rtl/dwt53_frame.v`, state SEP)
 
-![03 fir pe](../../figures/hardware/03_fir_pe.svg)
+- `vertical = (pass_no == 1)`; `axis_sample()` selects `frame` or `mid` and row or column indexing, `sample_k(k)` adds the offset.
+- One clock per pair: `write_pair(lo8(sample_k(-2), …, sample_k(2)), hi8(sample_k(0), sample_k(1), sample_k(2)))`.
+- `advance_pair()` steps `inner_idx`, then `outer_idx`, then the pass, then enters DRAIN.
 
-![02 memory layout](../../figures/hardware/02_memory_layout.svg)
+## Schedule
 
-## 3. RTL mapping
+| Stage | Clocks |
+|---|---:|
+| pass 0, rows | *N*/2 |
+| pass 1, columns | *N*/2 |
+| total compute | *N* |
 
-- SEP executes lo8(sample_k(-2),…,sample_k(2)) and hi8(sample_k(0),sample_k(1),sample_k(2)).
-- vertical = (pass_no == 1). axis_sample() selects frame or mid and uses row or column indexing.
-- write_pair() sends two results to mid on pass 0 and coeff on pass 1.
-- advance_pair() increments inner_idx, then outer_idx, then switches passes or enters DRAIN.
+The [write-order fingerprint](../../figures/examples/09_rtl_schedules.png) shows the consequence: no output coefficient exists before the second half of the compute time, and the second pass writes column by column.
 
-Source: [dwt53_frame.v](../../rtl/dwt53_frame.v); inspect the corresponding controller branch and helper functions. The blocks are logical schematic groupings, not a claim that the top instantiates separate Verilog modules for every block.
+## Memory and ports
 
-## 4. Controller schedule
+Each clock issues 5 reads and 2 writes. Consecutive pairs overlap by three samples, so a five-register sliding window would cut fresh reads to 2 per clock along a row. The column pass reads with stride *W*: a single-port block RAM cannot serve it at one pair per clock without banking, a transpose buffer or a two-row read pattern.
 
-| Stage | Clocks / handshakes |
-|---|---|
-| LOAD | N input handshakes |
-| ROW PASS | N/2 clocks |
-| COLUMN PASS | N/2 clocks |
-| DRAIN | N output handshakes |
+## Where it fits and how to improve it
 
-One logical pair per compute clock; first pass packs horizontal low/high halves.
+Simplest control and the reference for the others. In production: a sliding sample window, a banked or transposed `mid`, registered adder trees, and a 13-bit `mid` (first-pass values need 13 bits, [theory §9](../../docs/theory.md#9-exact-integer-arithmetic-the-rtl-contract)), which saves 59 % of the intermediate storage.
 
-Column pass consumes the full intermediate array and packs vertical halves.
-
-The RTL describes five logical reads and two writes per pair; physical RAM banking is not implemented.
-
-## 5. Memory ports and implementation cost
-
-Five logical reads and two distinct writes per compute clock. The horizontal neighborhood overlaps the next pair by three positions, but the present RTL uses random-index expressions instead of a shift-register window. Vertical reads have stride W in the original row-major layout. A one-port or two-port block RAM cannot serve all accesses at the assumed issue rate without banking, replication, staged reads or a schedule change.
-
-## 6. Numerical behavior and validation
-
-No intermediate truncation is used. A final signed coefficient is 64 times the floating-point reference. The [worked example](../worked_example.md) gives a numerical input, full packed output, and per-architecture trace. Run `make test` from the repository root to compare this architecture and all other variants against the independent integer oracle. The simulation commands are provided, not evidence of a completed simulation run.
-
-## 7. Production FPGA optimization
-
-A practical implementation uses a five-sample sliding register window, a banked or transposed intermediate layout, and registered FIR stages. If reads and writes are serialized, the N-cycle formula no longer holds. Compare a true dual-bank transpose buffer with a line-based alternative; report achieved rather than assumed II and memory traffic.
-
-[Compare all six architectures](README.md) · [Performance model](../performance.md) · [Hardware handbook](../README.md)
+[All chapters](README.md) · [Performance](../performance.md) · [Handbook](../README.md)

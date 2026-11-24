@@ -1,4 +1,7 @@
-"""Generate natural-image and synthetic decomposition galleries, no network required for local input."""
+"""Decomposition galleries for synthetic patterns, scikit-image samples and local images.
+
+Usage: python python/gallery.py [--natural] [--image FILE ...] [--size 256] [--out DIR]
+"""
 import argparse
 from pathlib import Path
 import numpy as np
@@ -16,23 +19,47 @@ def synthetic(n):
         "checkerboard": ((r//8+c//8)%2).astype(float)
     }
 
-def draw(name,x,out):
-    c=decompose(x,3,"fir"); z=reconstruct(c,3)
+def draw(name, x, out):
+    """Decomposition panel for one image: bands, 3-level pyramid, reconstruction.
+
+    Asserts that all six schedules agree, then writes out/<name>.png.
+    Detail bands share one robust symmetric scale (99.5th percentile);
+    the pyramid uses a per-level scale with LL in gray.
+    """
+    import figstyle as fs
+    fs.setup()
+    c = decompose(x, 3, "fir")
+    z = reconstruct(c, 3)
     for method in METHODS:
-        np.testing.assert_allclose(decompose(x,3,method),c,atol=1e-12)
-    one=decompose(x,1,"fir"); h,w=np.array(x.shape)//2
-    bands=[one[:h,:w],one[:h,w:],one[h:,:w],one[h:,w:]]
-    lim=max(1e-12,max(np.max(abs(b)) for b in bands[1:]))
-    fig,axes=plt.subplots(2,4,figsize=(13,6.5),layout="constrained")
-    entries=[(x,"Input","gray",0,1),(bands[0],"LL","gray",0,1)]
-    entries.extend((b,t,"RdBu_r",-lim,lim) for b,t in zip(bands[1:],["LH","HL","HH"]))
-    entries.extend([(np.sign(c)*np.log1p(20*abs(c)),"3-level pyramid","RdBu_r",-3,3),
-                    (z,"Reconstruction","gray",0,1),
-                    (abs(z-x),"Absolute error","magma",0,1e-12)])
-    for ax,(v,t,cm,lo,hi) in zip(axes.ravel(),entries):
-        ax.imshow(v,cmap=cm,vmin=lo,vmax=hi); ax.set_title(t); ax.axis("off")
-    fig.suptitle(f"{name}: CDF 5/3 | max reconstruction error {np.max(abs(z-x)):.2e}")
-    fig.savefig(out/f"{name}.png",dpi=180); plt.close(fig)
+        np.testing.assert_allclose(decompose(x, 3, method), c, atol=1e-12)
+    one = decompose(x, 1, "fir")
+    h, w = np.array(x.shape) // 2
+    bands = [one[:h, :w], one[:h, w:], one[h:, :w], one[h:, w:]]
+    lim = max(1e-12, np.percentile(np.abs(np.concatenate([b.ravel() for b in bands[1:]])), 99.5))
+    err = np.abs(z - x)
+    fig, axes = plt.subplots(2, 4, figsize=(13, 6.9))
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.86, bottom=0.02, wspace=0.06, hspace=0.16)
+    panels = [(x, "Input", "gray", 0, 1), (bands[0], "LL  approximation", "gray", 0, 1),
+              (bands[1], "LH  vertical edges", fs.DIV, -lim, lim), (bands[2], "HL  horizontal edges", fs.DIV, -lim, lim),
+              (bands[3], "HH  diagonal detail", fs.DIV, -lim, lim)]
+    for ax, (v, t, cm, lo, hi) in zip(axes.ravel(), panels):
+        ax.imshow(v, cmap=cm, vmin=lo, vmax=hi)
+        ax.set_title(t, loc="left", fontsize=10.5)
+    ax = axes[1, 1]
+    ax.imshow(fs.pyramid_rgb(c, 3))
+    fs.draw_band_grid(ax, c.shape, 3, fontsize=7.5)
+    ax.set_title("3-level pyramid", loc="left", fontsize=10.5)
+    axes[1, 2].imshow(z, cmap="gray", vmin=0, vmax=1)
+    axes[1, 2].set_title("Reconstruction", loc="left", fontsize=10.5)
+    axes[1, 3].imshow(err, cmap=fs.SEQ, vmin=0, vmax=max(err.max(), 1e-15))
+    axes[1, 3].set_title(f"|error|, max {err.max():.1e}", loc="left", fontsize=10.5)
+    for a in axes.ravel():
+        fs.image_axis(a)
+    fs.title(fig, f"{name}: CDF 5/3 decomposition",
+             "Six schedules checked equal; detail bands on one symmetric scale, red positive, blue negative.")
+    fig.savefig(out / f"{name}.png", dpi=150, facecolor=fs.SURFACE)
+    plt.close(fig)
+
 
 def main():
     p=argparse.ArgumentParser()

@@ -1,0 +1,52 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Halo-tiled direct 2-D engine (ARCH 4)};
+  \node[sub] at (0,-0.62) {Copy a (2\var{T}+3)² raw patch with a global periodic halo, then emit \var{T}² quartets from the local window. Tiles live in coefficient space.};
+  % datapath
+  \node[mem, minimum width=24mm, minimum height=16mm] (fr) at (1.4,-2.9) {\texttt{frame}\\\footnotesize \var{N} × 8 bit};
+  \node[ctl, minimum width=27mm, minimum height=14mm] (ld) at (5.0,-2.9) {halo loader\\\footnotesize 1 pixel / clock};
+  \node[mem, minimum width=27mm, minimum height=16mm] (pt) at (8.8,-2.9) {\texttt{patch}\\\footnotesize \var{P}² × 8 bit};
+  \node[alu, minimum width=30mm, minimum height=14mm] (dm) at (12.9,-2.9) {four masks\\\footnotesize LL, LH, HL, HH};
+  \node[mem, minimum width=27mm, minimum height=16mm] (co) at (17.0,-2.9) {\texttt{coeff}\\\footnotesize quartet writes};
+  \draw[bus] (fr) -- (ld);
+  \draw[bus] (ld) -- node[lbl, above] {write} (pt);
+  \draw[bus] (pt) -- node[lbl, above] {25 reads} (dm);
+  \draw[bus] (dm) -- node[lbl, above] {4 writes} (co);
+  \node[ctl, align=left, anchor=north west, minimum width=64mm] (c1) at (3.6,-4.35) {\textbf{TILE\_FILL}\quad \var{py}, \var{px} = 0…\var{P}−1 · \var{P}² clocks};
+  \node[ctl, align=left, anchor=north west, minimum width=60mm] (c2) at (11.2,-4.35) {\textbf{TILE\_EMIT}\quad \var{py}, \var{px} = 0…\var{T}−1 · \var{T}² clocks};
+  \draw[ctrl] (c1.east) -- (c2.west);
+  \draw[ctrl] (c2.south) -- ++(0,-0.35) -| node[lbl, pos=0.25, below] {next tile: \var{tx} += \var{T}, then \var{ty} += \var{T} · \var{N}/(4\var{T}²) tiles} (c1.south);
+  % geometry: T = 3, P = 9
+  \def\g{0.42} \def\gx{0.6} \def\gy{-6.4}
+  \node[head, anchor=south west] at (\gx,\gy+0.1) {Patch geometry, \var{T} = 3, \var{P} = 9};
+  \foreach \r in {0,...,8} \foreach \q in {0,...,8} {
+    \pgfmathtruncatemacro{\inner}{(\r>1)&&(\r<7)&&(\q>1)&&(\q<7)}
+    \ifnum\inner=1 \def\fc{alufill}\else\def\fc{ctlfill}\fi
+    \draw[draw=surface, line width=0.9pt, fill=\fc] (\gx+\q*\g,\gy-\r*\g) rectangle ++(\g,-\g);
+  }
+  \foreach \r in {0,1,2} \foreach \q in {0,1,2}
+    \fill[aluline] (\gx+2*\q*\g+2.5*\g,\gy-2*\r*\g-2.5*\g) circle (2.4pt);
+  \draw[accent, line width=1.2pt] (\gx+4*\g,\gy-4*\g) rectangle ++(5*\g,-5*\g);
+  \node[note, anchor=north west, text width=6.3cm] at (\gx+9.4*\g,\gy-0.05) {%
+    Gold: two-pixel halo on every side. Green: centre region.\\[2pt]
+    Dots: the 3 × 3 local centres (2\var{py}+2, 2\var{px}+2), each producing one quartet.\\[2pt]
+    Orange: the 5 × 5 window of the last centre; ±2 fits exactly in [0, 2\var{T}+2].\\[2pt]
+    Neighbouring patches overlap by 3 rows or columns; the halo uses global wrapped coordinates, so tiles have no seams.};
+  % numbers
+  \node[note, anchor=north west, text width=8.2cm] at (11.6,\gy-0.05) {%
+    \textbf{Cost per frame}\\[2pt]
+    compute clocks = (\var{N}/4\var{T}²)((2\var{T}+3)² + \var{T}²)\\
+    frame reads per pixel = (2\var{T}+3)²/(4\var{T}²)\\
+    patch = 8\var{P}² bits\\[4pt]
+    \begin{tabular}{@{}rrrr@{}}
+      \var{T} & clocks/\var{N} & reads/pixel & patch\\
+      1 & 6.50 & 6.25 & 200 b\\
+      4 & 2.14 & 1.89 & 968 b\\
+      8 & 1.66 & 1.41 & 2,888 b\\
+      32 & 1.35 & 1.10 & 35,912 b\\
+    \end{tabular}\\[3pt]
+    Large tiles approach 1.25\var{N} clocks and one read per pixel.};
+\end{tikzpicture}
+\end{document}

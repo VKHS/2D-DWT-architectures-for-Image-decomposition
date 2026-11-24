@@ -1,8 +1,25 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite this repository."
-title: "2D-DWT architectures for Image decomposition"
+message: "If you use this software, please cite it as below."
+title: "2-D DWT architectures for image decomposition"
 type: software
 authors:
   - family-names: "Khalili Sadaghiani"
     given-names: "Abdolvahab"
+    orcid: "https://orcid.org/0000-0003-4870-2768"
+    affiliation: "Department of Electrical Engineering, Linköping University, Linköping, Sweden"
 repository-code: "https://github.com/VKHS/2D-DWT-architectures-for-Image-decomposition"
+abstract: >-
+  Six schedules of the separable 2-D CDF 5/3 discrete wavelet transform
+  (row-column FIR, fused lifting, direct 2-D, five-row line buffer,
+  halo-tiled 2-D and folded lifting) in Python, MATLAB and parameterised
+  Verilog, with an exact integer (Q6) arithmetic contract, an independent
+  integer oracle, a cycle-accurate model of the RTL and an illustrated
+  hardware handbook.
+keywords:
+  - discrete wavelet transform
+  - CDF 5/3
+  - lifting scheme
+  - image decomposition
+  - VLSI architecture
+  - FPGA
+  - Verilog

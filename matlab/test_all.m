@@ -1,4 +1,7 @@
 function test_all
+%TEST_ALL  All six schedules against the row-column FIR and perfect
+%   reconstruction, on random, constant and identity arrays from 2x2 to
+%   64x64 with 1-3 levels and tile size 3. Runs in MATLAB and Octave.
 rng(17);
 methods={'fir','lifting','direct2d','line','tile','folded'};
 for shape={[2 2],[8 12],[32 48],[64 64]}

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  software:
+    name: Python schedules, oracle and RTL model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements.txt
+      - run: make software model vectors
+
+  rtl:
+    name: Icarus Verilog, ARCH 0-5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y iverilog
+      - run: python -m pip install -r requirements.txt
+      - run: make rtl
+      - run: make rtl H=4 W=4 TILE=1
+      - run: make rtl H=16 W=16 TILE=4
+
+  matlab:
+    name: MATLAB code under Octave
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y octave
+      - run: octave --no-gui --eval "addpath('matlab'); test_all"

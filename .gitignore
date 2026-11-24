@@ -5,3 +5,4 @@ build/
 *.jou
 *.log
 .Xil/
+*.aux

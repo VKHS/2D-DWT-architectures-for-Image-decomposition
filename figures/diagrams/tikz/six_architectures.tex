@@ -1,0 +1,65 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Six schedules for one transform};
+  \node[sub] at (0,-0.62) {Same CDF 5/3 arithmetic, same periodic boundary, bit-identical Q6 output. What changes is order, storage and memory traffic (512 × 512, TILE = 8).};
+  \tikzset{
+    m/.style={mem, minimum height=6.5mm, minimum width=10mm, font=\scriptsize, inner xsep=2pt},
+    p/.style={alu, minimum height=6.5mm, minimum width=10mm, font=\scriptsize, inner xsep=2pt},
+    a/.style={-{Latex[length=1.6mm,width=1.2mm]}, draw=wire, line width=0.7pt},
+    stat/.style={font=\footnotesize, anchor=north west, text=ink2, align=left},
+  }
+  % card(x, y, arch, name, color)
+  \newcommand{\card}[5]{%
+    \node[draw=hair, fill=white, rounded corners=6pt, line width=0.8pt, minimum width=79mm, minimum height=48mm, anchor=north west] (c#3) at (#1,#2) {};
+    \fill[#5] ($(c#3.north west)+(0.18,-0.2)$) rectangle ++(0.11,-0.62);
+    \node[font=\footnotesize, text=ink2, anchor=north west] at ($(c#3.north west)+(0.42,-0.16)$) {ARCH #3};
+    \node[font=\bfseries\normalsize, anchor=north west] at ($(c#3.north west)+(0.42,-0.5)$) {#4};
+  }
+  \definecolor{c0}{HTML}{2A78D6}\definecolor{c1}{HTML}{EB6834}\definecolor{c2}{HTML}{1BAF7A}
+  \definecolor{c3}{HTML}{EDA100}\definecolor{c4}{HTML}{E87BA4}\definecolor{c5}{HTML}{008300}
+  \def\dx{8.25} \def\dy{5.25}
+  \card{0.2}{-1.45}{0}{Row-column FIR}{c0}
+  \card{0.2+\dx}{-1.45}{1}{Fused lifting}{c1}
+  \card{0.2+2*\dx}{-1.45}{2}{Direct 2-D}{c2}
+  \card{0.2}{-1.45-\dy}{3}{Five-row line buffer}{c3}
+  \card{0.2+\dx}{-1.45-\dy}{4}{Halo-tiled 2-D}{c4}
+  \card{0.2+2*\dx}{-1.45-\dy}{5}{Folded lifting}{c5}
+  % flows ------------------------------------------------------------------
+  \newcommand{\flowfive}[6]{% card, f1, p1, s, p2, f2
+    \node[m] (#1a) at ($(c#1.north west)+(0.85,-1.75)$) {#2};
+    \node[p, right=3.5mm of #1a] (#1b) {#3};
+    \node[m, right=3.5mm of #1b] (#1c) {#4};
+    \node[p, right=3.5mm of #1c] (#1d) {#5};
+    \node[m, right=3.5mm of #1d] (#1e) {#6};
+    \foreach \u/\v in {a/b, b/c, c/d, d/e} \draw[a] (#1\u) -- (#1\v);}
+  \flowfive{0}{frame}{FIR}{\texttt{mid}}{FIR}{coeff}
+  \flowfive{1}{frame}{lift}{\texttt{mid}}{lift}{coeff}
+  \flowfive{3}{frame}{FIR}{5 rows}{FIR}{coeff}
+  \flowfive{5}{frame}{pred ×3}{\texttt{mid}}{pred ×3}{coeff}
+  \node[m] (2a) at ($(c2.north west)+(0.85,-1.75)$) {frame};
+  \node[p, right=3.5mm of 2a, minimum width=30mm] (2b) {5 × 5 window, 4 masks};
+  \node[m, right=3.5mm of 2b] (2c) {coeff};
+  \draw[a] (2a) -- (2b); \draw[a] (2b) -- (2c);
+  \node[m] (4a) at ($(c4.north west)+(0.85,-1.75)$) {frame};
+  \node[m, right=3.5mm of 4a] (4b) {patch};
+  \node[p, right=3.5mm of 4b, minimum width=18mm] (4c) {4 masks};
+  \node[m, right=3.5mm of 4c] (4d) {coeff};
+  \draw[a] (4a) -- (4b); \draw[a] (4b) -- (4c); \draw[a] (4c) -- (4d);
+  % stats -------------------------------------------------------------------
+  \newcommand{\stats}[5]{% card, clocks, store, reads, note
+    \node[stat] at ($(c#1.north west)+(0.42,-2.4)$) {%
+      \begin{tabular}{@{}l@{\hspace{3mm}}l@{\hspace{3mm}}l@{}}
+        \textbf{\color{ink}#2} & \textbf{\color{ink}#3} & \textbf{\color{ink}#4}\\[-1pt]
+        compute clocks & working store & frame reads / pixel
+      \end{tabular}\\[5pt]
+      \parbox{7.2cm}{\raggedright #5}};}
+  \stats{0}{1.00 \var{N}}{1 MiB}{2.50}{Baseline: one FIR pair per clock, full intermediate frame, 5 reads per clock.}
+  \stats{1}{1.00 \var{N}}{1 MiB}{2.50}{Same schedule; 6 adders per pair instead of 7, the prediction dp shared by both outputs.}
+  \stats{2}{0.25 \var{N}}{none}{6.25}{Fastest schedule: a whole quartet per clock, at the price of 25 reads per clock and 64 weighted terms.}
+  \stats{3}{1.75 \var{N}}{10 KiB}{6.25}{Smallest separable store (5\var{W} words); refills five rows per group; a rotating buffer approaches \var{N} clocks.}
+  \stats{4}{1.66 \var{N}}{361 B}{1.41}{Lowest frame traffic: each pixel is fetched about once into a local patch; halo overlap costs extra clocks.}
+  \stats{5}{3.00 \var{N}}{1 MiB}{3.50}{Least arithmetic and the fewest ports: one predictor, at most 3 reads per clock, 3 clocks per pair.}
+\end{tikzpicture}
+\end{document}

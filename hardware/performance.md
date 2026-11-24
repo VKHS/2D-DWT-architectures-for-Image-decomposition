@@ -1,28 +1,31 @@
-# Analytical hardware cost and design trade-offs
+# Performance
 
-Let N=HW, T=TILE and P=2T+3. The frame buffers total 40N logical bits (8N input + 32N output) for every architecture. The following working-store and latency models are derived from controller states and exclude backpressure, FPGA primitive padding, replication, registers outside the named arrays and routing.
+**Author: Abdolvahab Khalili Sadaghiani**
 
-| ARCH | Compute clocks | Total unstalled transfer + compute clocks | Working bits |
-|---|---:|---:|---:|
-| 0 FIR | N | 3N | 32N |
-| 1 lifting | N | 3N | 32N |
-| 2 direct | N/4 | 9N/4 | 0 extra array bits |
-| 3 line | 7N/4 | 15N/4 | 160W |
-| 4 tile | N(P²+T²)/(4T²) | 2N + compute | 8P² |
-| 5 folded | 3N | 5N | 32N+64 |
+*N* = *H*·*W*, *T* = TILE, *P* = 2*T* + 3. Compute clocks run from the clock after the last input handshake to the first `out_valid`; LOAD and DRAIN add *N* handshakes each plus any stalls, and the three frame stages do not overlap. Every value below is reproduced clock by clock by [`python/rtl_model.py`](../python/rtl_model.py).
 
-ARCH 3 refill costs (H/2)(5W/2) and vertical emission costs (H/2)W. ARCH 4 requires N/(4T²) tiles and spends P²+T² clocks on each tile. ARCH 5 has two passes, each N/2 pairs, each taking three clocks. There is no pipeline overlap across frames.
+| ARCH | Compute clocks | Total, no stalls | Working bits | Frame reads / pixel | Reads / clock |
+|---:|---:|---:|---:|---:|---:|
+| 0 FIR | *N* | 3*N* | 32*N* | 2.50 | 5 |
+| 1 lifting | *N* | 3*N* | 32*N* | 2.50 | 5 |
+| 2 direct | *N*/4 | 9*N*/4 | 0 | 6.25 | 25 |
+| 3 line | 7*N*/4 | 15*N*/4 | 160*W* | 6.25 | 5 |
+| 4 tile | *N*(*P*² + *T*²)/(4*T*²) | 2*N* + compute | 8*P*² | *P*²/(4*T*²) | 25 |
+| 5 folded | 3*N* | 5*N* | 32*N* + 64 | 3.50 | 3 |
 
-![Analytical cost chart](../figures/hardware/10_cost_comparison.svg)
+For 256 × 256 and *T* = 8: 65,536, 65,536, 16,384, 114,688, 108,800 and 196,608 compute clocks. For tiles, 256 tiles × (361 + 64) = 108,800.
 
-For a hypothetical 200 MHz achieved clock, frame throughput would be fclk/(2N+C) under a stall-free interface. This is a conditional formula, not an achieved clock or measurement. For 256×256, T=8, the common I/O buffers are 2,621,440 bits before RAM mapping. A full intermediate adds 2,097,152 bits, a line buffer adds 40,960 bits, and the tile patch adds 2,888 bits. These savings concern intermediate capacity only, not total physical utilization.
+All architectures also hold the input frame (8*N* bits) and the output store (32*N* bits): 2,621,440 bits at 256 × 256. On top of that, the full intermediate adds 2,097,152 bits, the line buffer 40,960 and the tile patch 2,888.
 
-## Practical FPGA decisions
+Frame throughput at an achieved clock *f* is *f* / (2*N* + *C*) frames per second without stalls, where *C* is the compute-clock count above. Overlapping LOAD, compute and DRAIN across frames (double-buffered frame and output stores) would raise it to *f* / max(*N*, *C*).
 
-- If memory dominates, compare the line and tile variants, but account for frame storage and memory bandwidth.
-- If latency dominates, the direct 2-D variant has fewer modeled clocks but potentially expensive combinational reduction, fanout and read ports.
-- If arithmetic area dominates, folded lifting is a candidate; physical sharing requires inspecting the synthesized netlist.
-- If sustained streaming dominates, a rotating line buffer with registered FIR or lifting is a promising *future* design, not the implemented full-frame RTL.
-- Compare hardware at identical image dimensions, arithmetic precision, boundary behavior, output interface and target device. Report post-route clock, latency, II, LUTs, FFs, DSPs, BRAM/URAM, power and image accuracy separately.
+![Cost model](../figures/examples/10_hardware_costs.png)
 
-The original software arithmetic counts in docs/architecture.md describe ideal filter arithmetic, not the number of operators in a synthesized implementation. In particular, fused lifting recomputes both neighboring predictions; a streaming prediction cache can reduce repeated work. The present line RTL refills all five rows rather than caching overlaps.
+## Reading the trade-offs
+
+- **Clock count and clock rate pull in opposite directions.** ARCH 2 needs a quarter of ARCH 0's clocks but evaluates 64 weighted terms with 25 reads in one clock.
+- **Storage and traffic are different resources.** The line buffer cuts the intermediate from *N* to 5*W* words but, as implemented, reads the frame 6.25 times per pixel; tiles read it about once.
+- **Folding trades time for ports.** ARCH 5 takes three times longer than ARCH 1 but never needs more than three reads in one clock.
+- **Word length is a free win.** Final coefficients need 16 bits and first-pass values 13, against 32 in the reference.
+
+The [cost model](../docs/architecture.md) collects these into concrete improvements with their measured effect. Synthesis and board results depend on the target device, clock constraint and memory mapping; [`scripts/synth_vivado.tcl`](../scripts/synth_vivado.tcl) produces them for a chosen part.

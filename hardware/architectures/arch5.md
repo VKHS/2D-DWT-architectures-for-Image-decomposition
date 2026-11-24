@@ -1,54 +1,31 @@
-# ARCH 5 — Folded lifting with three-phase control
+# ARCH 5 — Folded lifting
 
-**Compute: 3N clocks · working store: 32N bits + two 32-bit regs** (analytical; excludes frame I/O stalls).
+**Compute: 3*N* clocks · working store: 32*N* + 64 bits · 3.50 frame reads per pixel · 3 reads per clock**
 
-![Detailed architecture](../../figures/hardware/arch5_folded_lifting.svg)
+![Folded lifting element](../../figures/diagrams/pe_folded.svg)
 
-## 1. Dataflow and operating principle
+## Principle
 
-ARCH 5 uses the separable lifting factorization but serializes the two prediction operations. In phase 0, select offsets (0,1,2) and capture dp into saved_d. In phase 1, select offsets (−2,−1,0) and capture dm into saved_prev. In phase 2, form 8c+saved_d+saved_prev and 4saved_d, call write_pair(), and advance to the next pair. The first pass is vertical, unlike ARCH 0/1. The second pass is horizontal. Because the transform is separable and no intermediate rounding occurs, the output layout and coefficients are unchanged.
+The separable lifting factorisation with one shared predictor. Phase 0 selects offsets (0, 1, 2) and stores `dp` in `saved_d`. Phase 1 selects offsets (−2, −1, 0) and stores `dm` in `saved_prev`. Phase 2 forms `low8 = 8c + saved_d + saved_prev` and `high8 = 4·saved_d`, writes the pair and advances. The first pass is vertical and the second horizontal; because the arithmetic is exact, the output is bit-identical to the row-first schedules.
 
-## 2. Processing element and physical organization
+## RTL mapping (state SEP with `phase`)
 
-![09 folded timing](../../figures/hardware/09_folded_timing.svg)
+- `vertical = (ARCH == 5) ? (pass_no == 0) : (pass_no == 1)`.
+- `folded_offset = (phase == 0) ? 0 : -2`; phases 0 and 1 call `pred2(sample_k(folded_offset), …)`.
+- Phase 2: `write_pair((sample_k(0) <<< 3) + saved_d + saved_prev, saved_d <<< 2)`, then `advance_pair()`.
 
-![04 lifting pe](../../figures/hardware/04_lifting_pe.svg)
+## Schedule and memory
 
-## 3. RTL mapping
+| Stage | Clocks |
+|---|---:|
+| pass 0, columns: *N*/2 pairs × 3 | 3*N*/2 |
+| pass 1, rows: *N*/2 pairs × 3 | 3*N*/2 |
+| total compute | 3*N* |
 
-- vertical = (pass_no==0) for ARCH 5.
-- folded_offset is 0 in phase 0 and −2 otherwise.
-- phase < 2 calls pred2() and writes saved_d or saved_prev.
-- phase 2 calls write_pair() and advance_pair(), which resets phase to zero.
-- pass 0 writes mid; pass 1 writes coeff.
+Per pair: 3 + 3 + 1 = 7 sample reads, never more than 3 in one clock. That is the lowest read-port pressure of the six, at the cost of 3.5 frame reads per pixel and the full `mid` frame.
 
-Source: [dwt53_frame.v](../../rtl/dwt53_frame.v); inspect the corresponding controller branch and helper functions. The blocks are logical schematic groupings, not a claim that the top instantiates separate Verilog modules for every block.
+## Where it fits and how to improve it
 
-## 4. Controller schedule
+The smallest arithmetic footprint: one predictor, one update, two registers. Carrying `dp` forward as the next pair's `dm` removes phase 1 (2 clocks and 4 reads per pair, about 2*N* clocks per frame, plus one extra prediction per line for the wrap). Check the synthesised netlist to confirm that the predictor is shared, and make operand multiplexers explicit if it is not.
 
-| Stage | Clocks / handshakes |
-|---|---|
-| LOAD | N input handshakes |
-| COLUMN | 3N/2 clocks |
-| ROW | 3N/2 clocks |
-| DRAIN | N output handshakes |
-
-Phase 0 captures dp; phase 1 captures dm; phase 2 writes (8c+dp+dm, 4dp).
-
-The same logical predictor expression serves two phases; exact physical sharing depends on synthesis.
-
-Folding reduces issue rate to one pair per three clocks; the intermediate frame is still required.
-
-## 5. Memory ports and implementation cost
-
-The two prediction clocks each use three logical source samples and one prediction-register write. The final clock uses the center sample plus two prediction registers and writes two coefficients. The full intermediate array remains. Lower per-clock arithmetic demand is possible, but memory structure and the synthesized predictor mux still affect area and timing.
-
-## 6. Numerical behavior and validation
-
-No intermediate truncation is used. A final signed coefficient is 64 times the floating-point reference. The [worked example](../worked_example.md) gives a numerical input, full packed output, and per-architecture trace. Run `make test` from the repository root to compare this architecture and all other variants against the independent integer oracle. The simulation commands are provided, not evidence of a completed simulation run.
-
-## 7. Production FPGA optimization
-
-Instantiate one explicit predictor if tool reports show duplicated arithmetic, then make operand and result multiplexers explicit. Reuse predictions across consecutive positions to reduce redundant work, or select a two-phase schedule. Any revised controller must retain correct phase validity, wrapping, pass transitions, and output ordering.
-
-[Compare all six architectures](README.md) · [Performance model](../performance.md) · [Hardware handbook](../README.md)
+[All chapters](README.md) · [Performance](../performance.md) · [Handbook](../README.md)

@@ -1,0 +1,62 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {One level of the separable 2-D DWT};
+  \node[sub] at (0,-0.62) {Filter every row with the 1-D pair and keep every second column, then filter every column and keep every second row.};
+  \def\S{4.3cm}
+  % image row ------------------------------------------------------------
+  \node[inner sep=0pt, anchor=north west] (i0) at (0.2,-1.65) {\includegraphics[width=\S]{img/input.png}};
+  \node[inner sep=0pt, right=3.4cm of i0] (i1) {\includegraphics[width=\S]{img/rows.png}};
+  \node[inner sep=0pt, right=3.4cm of i1] (i2) {\includegraphics[width=\S]{img/packed.png}};
+  \foreach \n in {i0,i1,i2} \draw[hair, line width=0.6pt] (\n.south west) rectangle (\n.north east);
+  \draw[surface, line width=1.4pt] (i1.north) -- (i1.south);
+  \draw[surface, line width=1.4pt] (i2.north) -- (i2.south);
+  \draw[surface, line width=1.4pt] (i2.west) -- (i2.east);
+  \node[head, anchor=south west] at ($(i0.north west)+(0,1.5mm)$) {Image  \var{H} × \var{W}};
+  \node[head, anchor=south west] at ($(i1.north west)+(0,1.5mm)$) {After the row pass};
+  \node[head, anchor=south west] at ($(i2.north west)+(0,1.5mm)$) {After the column pass};
+  \tikzset{tag/.style={font=\bfseries\footnotesize, fill=surface, fill opacity=0.88, text opacity=1, inner sep=2pt, rounded corners=1.5pt, anchor=north west}}
+  \node[tag] at ($(i1.north west)+(1.2mm,-1.2mm)$) {L};
+  \node[tag] at ($(i1.north)+(1.2mm,-1.2mm)$) {H};
+  \node[tag] at ($(i2.north west)+(1.2mm,-1.2mm)$) {LL};
+  \node[tag] at ($(i2.north)+(1.2mm,-1.2mm)$) {LH};
+  \node[tag] at ($(i2.west)+(1.2mm,-1.2mm)$) {HL};
+  \node[tag] at ($(i2.center)+(1.2mm,-1.2mm)$) {HH};
+  \draw[bus] ($(i0.east)+(2mm,0)$) -- node[note, above=2mm, align=center] {each row:\\\var{H}₀ | \var{H}₁, ↓2} node[note, below=2mm, align=center] {\var{H} × \var{W}/2 each} ($(i1.west)+(-2mm,0)$);
+  \draw[bus] ($(i1.east)+(2mm,0)$) -- node[note, above=2mm, align=center] {each column:\\\var{H}₀ / \var{H}₁, ↓2} node[note, below=2mm, align=center] {\var{H}/2 × \var{W}/2 each} ($(i2.west)+(-2mm,0)$);
+
+  % branch tree ------------------------------------------------------------
+  \def\ty{-9.75}
+  \node[io, minimum width=11mm] (x) at (0.75,\ty) {\var{x}};
+  \node[alu, minimum width=26mm] (r0) at (4.2,\ty+1.25) {rows · \var{H}₀ · ↓2};
+  \node[alu, minimum width=26mm] (r1) at (4.2,\ty-1.25) {rows · \var{H}₁ · ↓2};
+  \node[mem, minimum width=9mm] (L) at (7.15,\ty+1.25) {L};
+  \node[mem, minimum width=9mm] (H) at (7.15,\ty-1.25) {H};
+  \node[alu, minimum width=29mm] (c00) at (10.6,\ty+1.9) {columns · \var{H}₀ · ↓2};
+  \node[alu, minimum width=29mm] (c01) at (10.6,\ty+0.6) {columns · \var{H}₁ · ↓2};
+  \node[alu, minimum width=29mm] (c10) at (10.6,\ty-0.6) {columns · \var{H}₀ · ↓2};
+  \node[alu, minimum width=29mm] (c11) at (10.6,\ty-1.9) {columns · \var{H}₁ · ↓2};
+  \foreach \s/\t/\y in {c00/LL/1.9, c01/HL/0.6, c10/LH/-0.6, c11/HH/-1.9}
+    \node[mem, minimum width=11mm, minimum height=8mm] (\t) at (14.15,\ty+\y) {\t};
+  \draw[sig] (x.east) -- ++(0.45,0) |- (r0.west);
+  \draw[sig] (x.east) -- ++(0.45,0) |- (r1.west);
+  \node[dot] at ($(x.east)+(0.45,0)$) {};
+  \draw[sig] (r0) -- (L);
+  \draw[sig] (r1) -- (H);
+  \draw[sig] (L.east) -- ++(0.35,0) |- (c00.west);
+  \draw[sig] (L.east) -- ++(0.35,0) |- (c01.west);
+  \draw[sig] (H.east) -- ++(0.35,0) |- (c10.west);
+  \draw[sig] (H.east) -- ++(0.35,0) |- (c11.west);
+  \node[dot] at ($(L.east)+(0.35,0)$) {};
+  \node[dot] at ($(H.east)+(0.35,0)$) {};
+  \foreach \s/\t in {c00/LL, c01/HL, c10/LH, c11/HH} \draw[sig] (\s) -- (\t);
+  \node[note, anchor=west] at ($(LL.east)+(3mm,0)$) {approximation · low-pass both ways};
+  \node[note, anchor=west] at ($(HL.east)+(3mm,0)$) {horizontal edges · vertical high-pass};
+  \node[note, anchor=west] at ($(LH.east)+(3mm,0)$) {vertical edges · horizontal high-pass};
+  \node[note, anchor=west] at ($(HH.east)+(3mm,0)$) {diagonal detail · high-pass both ways};
+  \node[grouplabel, anchor=south west] at (0.2,\ty+2.65) {THE FOUR BRANCHES · NAME = VERTICAL FILTER, THEN HORIZONTAL FILTER};
+  \node[note, anchor=north west, text width=19.5cm] at (0.2,\ty-2.75) {%
+    Packed layout used by every implementation: [LL LH ; HL HH], each band \var{H}/2 × \var{W}/2. The operations are linear and separable, so the column pass may run first (ARCH 5) with identical coefficients.};
+\end{tikzpicture}
+\end{document}

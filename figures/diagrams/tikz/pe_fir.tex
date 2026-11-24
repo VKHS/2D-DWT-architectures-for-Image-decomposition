@@ -1,0 +1,78 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\input{window_macro.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {FIR pair processing element};
+  \node[sub] at (0,-0.62) {Used by ARCH 0 and 3 (and, as outer products, ARCH 2 and 4). Constant multiplications are wiring shifts; only adders remain.};
+  \samplewindow{0.2}{-2.25}
+  % ---------------- low path ----------------
+  \def\X{5.0}
+  \node[net] (na) at (\X,-2.350) {a};
+  \node[net] (ne) at (\X,-3.250) {e};
+  \node[net] (nb) at (\X,-4.100) {b};
+  \node[net] (nd) at (\X,-5.000) {d};
+  \node[net] (nc) at (\X,-6.100) {c};
+  \node[add] (ae) at (\X+1.4,-2.800) {+};
+  \node[add] (bd) at (\X+1.4,-4.550) {+};
+  \node[shf] (bd1) at (\X+2.55,-4.550) {<<1};
+  \node[shf] (c2) at (\X+1.4,-5.700) {<<2};
+  \node[shf] (c1) at (\X+1.4,-6.500) {<<1};
+  \node[add] (c6) at (\X+2.55,-6.100) {+};
+  \node[add] (s1) at (\X+3.75,-5.300) {+};
+  \node[add] (lo) at (\X+5.0,-4.050) {+};
+  \node[mem, minimum width=19mm] (L8) at (\X+6.75,-4.050) {\texttt{low8}};
+  \draw[sig] (na.east) -| (ae.north);
+  \draw[sig] (ne.east) -| (ae.south);
+  \draw[sig] (nb.east) -| (bd.north);
+  \draw[sig] (nd.east) -| (bd.south);
+  \draw[nohead] (nc.east) -- ++(0.35,0) coordinate (cd);
+  \node[dot] at (cd) {};
+  \draw[sig] (cd) |- (c2.west);
+  \draw[sig] (cd) |- (c1.west);
+  \draw[sig] (bd) -- (bd1);
+  \draw[sig] (c2.east) -| (c6.north);
+  \draw[sig] (c1.east) -| (c6.south);
+  \draw[sig] (bd1.east) -| (s1.north);
+  \draw[sig] (c6.east) -| (s1.south);
+  \draw[sig] (ae.east) -| node[lbl, pos=0.25, above] {\var{a}+\var{e}} (lo.north);
+  \draw[sig] (s1.east) -| node[lbl, pos=0.75, right=1pt] {2(\var{b}+\var{d}) + 6\var{c}} (lo.south);
+  \draw[sig] (lo) -- (L8);
+  \node[font=\footnotesize\bfseries, text=pos] at ($(lo.north)+(-0.22,0.22)$) {−};
+  \node[lblc, anchor=south] at ($(bd1.north)+(0,0.3mm)$) {2(\var{b}+\var{d})};
+  \node[lblc, anchor=north] at ($(c6.south)+(0.35,-0.05)$) {6\var{c}};
+  % ---------------- high path ----------------
+  \node[net] (hc) at (\X,-7.900) {c};
+  \node[net] (he) at (\X,-8.800) {e};
+  \node[net] (hd) at (\X,-9.700) {d};
+  \node[add] (ce) at (\X+1.4,-8.350) {+};
+  \node[shf] (d1) at (\X+1.4,-9.700) {<<1};
+  \node[add] (hs) at (\X+2.75,-9.025) {+};
+  \node[shf] (h2) at (\X+3.95,-9.025) {<<2};
+  \node[mem, minimum width=19mm] (H8) at (\X+6.75,-9.025) {\texttt{high8}};
+  \draw[sig] (hc.east) -| (ce.north);
+  \draw[sig] (he.east) -| (ce.south);
+  \draw[sig] (hd) -- (d1);
+  \draw[sig] (ce.east) -| node[lbl, pos=0.3, above] {\var{c}+\var{e}} (hs.north);
+  \draw[sig] (d1.east) -| node[lbl, pos=0.3, below] {2\var{d}} (hs.south);
+  \draw[sig] (hs) -- (h2);
+  \draw[sig] (h2) -- (H8);
+  \node[font=\footnotesize\bfseries, text=pos] at ($(hs.north)+(-0.22,0.22)$) {−};
+  % groups
+  \begin{pgfonlayer}{groups}
+    \node[group, fit={(na)(nc)(c1)(lo)(L8)($(na.north)+(0,0.2)$)}] (gl) {};
+    \node[group, fit={(hc)(hd)(hs)(H8)}] (gh) {};
+  \end{pgfonlayer}
+  \node[grouplabel] at (gl.north west) {LOW PATH · −a + 2b + 6c + 2d − e};
+  \node[grouplabel] at (gh.north west) {HIGH PATH · 4 (2d − c − e)};
+  \node[note, anchor=north west, text width=7.6cm] at ($(gl.north east)+(0.6,0.1)$) {%
+    \textbf{Exact numerators, scale 8 per pass}\\[2pt]
+    \texttt{low8\; = −a + 2b + 6c + 2d − e}\\
+    \texttt{high8 = 4·(2d − c − e)}\\[6pt]
+    \textbf{Operators per pair}\\[2pt]
+    7 adders: 5 on the low path, 2 on the high path. Symmetric pre-adders (\var{a}+\var{e}, \var{b}+\var{d}) halve the tap work; shifts cost nothing.\\[6pt]
+    \textbf{Word growth, 8-bit unsigned input}\\[2pt]
+    First pass: \texttt{low8} in [−510, 2550], 13-bit signed; \texttt{high8} in [−2040, 2040], 12-bit signed. Final bands after the second pass fit 16-bit signed.\\[6pt]
+    \textbf{RTL}\quad \texttt{lo8()}, \texttt{hi8()} in \texttt{dwt53\_frame.v};\\ standalone module \texttt{dwt53\_fir\_pair}.};
+\end{tikzpicture}
+\end{document}

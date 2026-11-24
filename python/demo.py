@@ -36,5 +36,5 @@ def main():
     fig,axs=plt.subplots(1,4,figsize=(12,3))
     for ax,band,name in zip(axs,[c[:h,:w],c[:h,w:],c[h:,:w],c[h:,w:]],['LL','LH','HL','HH']):
         ax.imshow(band,cmap='gray' if name=='LL' else 'coolwarm'); ax.set_title(name); ax.axis('off')
-    fig.tight_layout(); fig.savefig(out/'subbands.png',dpi=180)
+    fig.tight_layout(); fig.savefig(out/'subbands.png',dpi=180); plt.close(fig)
 if __name__=='__main__': main()

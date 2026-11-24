@@ -1,0 +1,45 @@
+\documentclass[tikz,border=0pt]{standalone}
+\input{style.tex}
+\begin{document}
+\begin{tikzpicture}[canvas]
+  \node[ttl] at (0,0) {Two-pass separable datapath (ARCH 0, 1 and 5)};
+  \node[sub] at (0,-0.62) {One 1-D pair element serves both passes: pass 0 reads the frame and fills \texttt{mid}, pass 1 reads \texttt{mid} and fills \texttt{coeff}.};
+  % memories
+  \node[mem, minimum width=27mm, minimum height=16mm] (fr) at (1.6,-2.6) {\texttt{frame}\\\footnotesize \var{N} × 8 bit};
+  \node[mem, minimum width=27mm, minimum height=16mm] (mid) at (1.6,-5.0) {\texttt{mid}\\\footnotesize \var{N} × 32 bit};
+  % read mux
+  \draw[draw=ctlline, fill=ctlfill, line width=0.8pt] (4.0,-2.0) -- (4.8,-2.7) -- (4.8,-4.9) -- (4.0,-5.6) -- cycle;
+  \node[font=\scriptsize, text=ink2] at (4.33,-2.75) {0};
+  \node[font=\scriptsize, text=ink2] at (4.33,-4.85) {1};
+  \draw[bus] (fr.east) -- node[lbl, above] {5 reads} (4.0,-2.6);
+  \draw[bus] (mid.east) -- node[lbl, below] {5 reads} (4.0,-5.0);
+  \node[alu, minimum width=36mm, minimum height=22mm, align=center] (pe) at (7.6,-3.8) {\textbf{1-D pair element}\\[3pt]\footnotesize ARCH 0: FIR\\\footnotesize ARCH 1: fused lifting\\\footnotesize ARCH 5: folded lifting};
+  \draw[bus] (4.8,-3.8) -- node[lbl, above] {\var{a}…\var{e}} (pe.west);
+  % write demux
+  \draw[draw=ctlline, fill=ctlfill, line width=0.8pt] (10.2,-2.7) -- (11.0,-2.0) -- (11.0,-5.6) -- (10.2,-4.9) -- cycle;
+  \node[font=\scriptsize, text=ink2] at (10.68,-2.75) {1};
+  \node[font=\scriptsize, text=ink2] at (10.68,-4.85) {0};
+  \draw[bus] (pe.east) -- node[lbl, above] {low, high} (10.2,-3.8);
+  \node[mem, minimum width=27mm, minimum height=16mm] (co) at (13.3,-2.6) {\texttt{coeff}\\\footnotesize \var{N} × 32 bit};
+  \draw[bus] (11.0,-2.6) -- node[lbl, above] {2 writes} (co.west);
+  \draw[bus] (11.0,-5.0) -- (11.5,-5.0) -- (11.5,-6.55) -- (1.6,-6.55) -- node[lbl, right, pos=0.6] {2 writes} (mid.south);
+  % control
+  \node[ctl, minimum width=58mm, align=left, anchor=north west] (ctl) at (3.6,-7.3) {\textbf{SEP controller}\\[2pt]\footnotesize\texttt{pass\_no}, \texttt{outer\_idx}, \texttt{inner\_idx}, \texttt{phase} (ARCH 5)\\\footnotesize\texttt{vertical = ARCH==5 ? pass\_no==0 : pass\_no==1}};
+  \node[ctl, minimum width=62mm, align=left, anchor=north west] (ag) at (10.9,-7.3) {\textbf{Address generator}\\[2pt]\footnotesize read (\var{o}, wrap(2\var{i}+\var{k}, \var{W})) or (wrap(2\var{i}+\var{k}, \var{H}), \var{o}), \var{k} = −2…2\\\footnotesize write \var{i}, \var{i}+\var{W}/2 (rows) or \var{i}, \var{i}+\var{H}/2 (columns)};
+  \draw[ctrl] (ctl.east) -- (ag.west);
+  \draw[ctrl] (4.4,-7.3) -- node[lbl, right, pos=0.78] {src = \texttt{pass\_no}} (4.4,-5.38);
+  \draw[ctrl] (10.6,-7.3) -- node[lbl, left, pos=0.78] {dst = \texttt{pass\_no}} (10.6,-5.3);
+  \draw[ctrl] (pe.south|-0,-7.3) -- node[lbl, right, pos=0.7] {\texttt{phase}} (pe.south);
+  % schedule
+  \def\sy{-10.2}
+  \node[head, anchor=west] at (0.2,\sy+0.55) {Compute schedule (\var{N} = \var{H}·\var{W})};
+  \tikzset{seg/.style={draw=surface, line width=1.2pt, minimum height=8mm, anchor=west, font=\footnotesize, text=white}}
+  \node[font=\footnotesize, anchor=west] at (0.2,\sy-0.25) {ARCH 0, 1};
+  \node[seg, fill=memline, minimum width=40mm] at (2.6,\sy-0.25) {rows · \var{N}/2 clocks};
+  \node[seg, fill=memline!70!black, minimum width=40mm] at (6.6,\sy-0.25) {columns · \var{N}/2 clocks};
+  \node[font=\footnotesize, anchor=west] at (0.2,\sy-1.25) {ARCH 5};
+  \node[seg, fill=aluline, minimum width=60mm] at (2.6,\sy-1.25) {columns · 3\var{N}/2 clocks};
+  \node[seg, fill=aluline!70!black, minimum width=60mm] at (8.6,\sy-1.25) {rows · 3\var{N}/2 clocks};
+  \node[note, anchor=west, text width=8.6cm] at (15.1,\sy-0.75) {One pair per clock for ARCH 0/1 (\var{N} clocks per frame); three clocks per pair for ARCH 5 (3\var{N}). Working store: the full \texttt{mid} frame, 32\var{N} bits.};
+\end{tikzpicture}
+\end{document}

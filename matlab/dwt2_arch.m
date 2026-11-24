@@ -1,5 +1,18 @@
 function y = dwt2_arch(x, method, levels, tile)
-% Periodic floating-point CDF 5/3; packed [LL LH; HL HH].
+%DWT2_ARCH  Multilevel 2-D CDF 5/3 DWT with a selectable schedule.
+%   Y = DWT2_ARCH(X, METHOD, LEVELS, TILE) decomposes the image X (even
+%   dimensions divisible by 2^LEVELS) with periodic boundaries and returns
+%   the packed coefficients [LL LH; HL HH], band names in (vertical,
+%   horizontal) order, LL in pixel units. Each level re-decomposes LL.
+%
+%   METHOD  'fir'      row-column 5/3 FIR pairs            (RTL ARCH 0)
+%           'lifting'  row-column predict/update lifting   (RTL ARCH 1)
+%           'direct2d' four 5x5 outer-product masks        (RTL ARCH 2)
+%           'line'     five cached filtered rows           (RTL ARCH 3)
+%           'tile'     local patch with global halo, TILE  (RTL ARCH 4)
+%           'folded'   one 1-D lifting worker, columns first (RTL ARCH 5)
+%   All methods return the same coefficients. Defaults: 'lifting', 1, 16.
+%   Inverse: IDWT2_ARCH. Author: Abdolvahab Khalili Sadaghiani.
 if nargin<2, method='lifting'; end
 if nargin<3, levels=1; end
 if nargin<4, tile=16; end
@@ -24,7 +37,9 @@ case 'folded'
     for j=1:w, y(:,j)=lift1(x(:,j).').'; end
     for i=1:h, y(i,:)=lift1(y(i,:)); end
 case 'line'
-    % Five-slot tagged circular row cache; periodic random-access input.
+    % Five-slot tagged row cache, slot = row mod 5; periodic random-access
+    % input. Where the periodic wrap maps two needed rows to one slot, the
+    % tag check simply refills it, so results are unaffected.
     cache=zeros(5,w); tags=zeros(1,5);
     for i=0:H-1
         for b=1:2
