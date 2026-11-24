@@ -38,6 +38,12 @@ Analytical controller clocks, excluding input/output and stalls. See the [comple
 
 Run the software and RTL regression with `make test` (requires Python dependencies and Icarus Verilog). The tests are supplied for execution; no simulator or hardware results are asserted.
 
+## Image decomposition gallery
+
+![Computed benchmark patterns](figures/example_gallery.svg)
+
+[Image examples and benchmark instructions](examples/README.md) cover natural photographs (Camera, Astronaut, Chelsea), synthetic patterns and locally provided images, including Lena. Run `python python/gallery.py --natural` after installing scikit-image to generate full decomposition and reconstruction figures.
+
 ## Quick start
 
 Python 3.10+:

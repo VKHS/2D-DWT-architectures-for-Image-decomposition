@@ -52,7 +52,7 @@ All variants include N raw pixels and N signed output coefficients; the table co
     pip install -r requirements.txt
     # Linux: install iverilog using your package manager
     make test
-    make test H=16 W=16 TILE=4 IMAGE=examples/astronaut.pgm
+    make test H=16 W=16 TILE=4 IMAGE=/path/to/astronaut.png
 
 The testbench uses 6 frames (zero, max constant, boundary impulse, checkerboard, ramp, seeded random or user image), randomized-pattern deterministic input gaps/output stalls, row-major index checks and exact signed comparison with an independent outer-product integer oracle. It reports compute cycles. The oracle also compares all six Python methods. Simulations should run on Icarus Verilog (2012 testbench syntax; core uses Verilog-2001). The repository includes no fabricated simulator or synthesis logs.
 
