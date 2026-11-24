@@ -21,6 +21,23 @@ A comparative research and educational reference for six implementations of the 
 
 The six are representative design choices, not a citation-count ranking. A real implementation may combine lifting, line buffering, tiling and folding. The direct and tiled variants intentionally share arithmetic, not scheduling. Line buffering assumes random-access periodic input; a strict raster-only device needs a boundary prologue/epilogue or external storage.
 
+## Illustrated hardware handbook
+
+![Common hardware organization](figures/hardware/01_top_level.svg)
+
+[Open the complete illustrated hardware handbook](hardware/README.md) · [Six individual architecture chapters](hardware/architectures/README.md) · [Arithmetic and addressing](hardware/datapath.md) · [Worked example](hardware/worked_example.md) · [Performance](hardware/performance.md) · [Verification](hardware/verification.md)
+
+| Architecture | Detailed chapter | Schematic |
+|---|---|---|
+| 0 Row-column FIR | [Read](hardware/architectures/arch0.md) | [Datapath](figures/hardware/arch0_row_column.svg) |
+| 1 Fused lifting | [Read](hardware/architectures/arch1.md) | [Datapath](figures/hardware/arch1_lifting.svg) |
+| 2 Direct 2-D FIR | [Read](hardware/architectures/arch2.md) | [Datapath](figures/hardware/arch2_direct_2d.svg) |
+| 3 Line buffered | [Read](hardware/architectures/arch3.md) | [Datapath](figures/hardware/arch3_line_buffered.svg) |
+| 4 Halo tiled | [Read](hardware/architectures/arch4.md) | [Datapath](figures/hardware/arch4_halo_tiled.svg) |
+| 5 Folded lifting | [Read](hardware/architectures/arch5.md) | [Datapath](figures/hardware/arch5_folded_lifting.svg) |
+
+![Analytical hardware comparison](figures/hardware/10_cost_comparison.svg)
+
 ## RTL and hardware architecture
 
 ![Six hardware datapaths](figures/hardware_dataflow.svg)
@@ -37,6 +54,10 @@ The six are representative design choices, not a citation-count ranking. A real 
 Analytical controller clocks, excluding input/output and stalls. See the [complete hardware guide](hardware/README.md) for fixed-point equations, signal protocol, memory architecture, synthesis caveats and mapping guidance. The [Verilog top](rtl/dwt53_frame.v) provides six parameterized schedules; [pair primitives](rtl/dwt53_pair.v), a [testbench](tb/tb_dwt53.v), [golden model](hardware/golden.py) and [Vivado synthesis script](scripts/synth_vivado.tcl) accompany it.
 
 Run the software and RTL regression with `make test` (requires Python dependencies and Icarus Verilog). The tests are supplied for execution; no simulator or hardware results are asserted.
+
+## Classical image-processing benchmarks
+
+The preferred experiment suite is Lena, Barbara, Cameraman, Peppers, Boat, Mandrill and House. Use the [classic benchmark workflow](examples/README.md) to generate original image, all four subbands, multilevel pyramid, reconstruction, exact Q6 coefficient map and error statistics for locally supplied images. The original photographs are not bundled; Camera is available through the optional scikit-image data package. The synthetic examples below are committed computed figures, not substitutes labeled as classical photographs.
 
 ## Image decomposition gallery
 

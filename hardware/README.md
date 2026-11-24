@@ -6,6 +6,18 @@ This is a parameterized, single-level Verilog RTL reference, not a claim of FPGA
 
 ![Hardware overview](../figures/hardware_dataflow.svg)
 
+## Illustrated handbook navigation
+
+![Common top-level RTL](../figures/hardware/01_top_level.svg)
+
+| Chapter | Contents |
+|---|---|
+| [Common datapath](datapath.md) | Arithmetic schematics, signal interface, subband address map, controller FSM |
+| [Six architecture chapters](architectures/README.md) | Dedicated hardware schematics, RTL mapping, schedule, memory ports and optimization |
+| [Worked example](worked_example.md) | Numerical 4×4 decomposition and controller traces |
+| [Performance model](performance.md) | Cycle equations, logical memory footprint, trade-off chart |
+| [Verification and deployment](verification.md) | Regression, simulation and Vivado workflow |
+
 ## 1. Exact arithmetic contract
 
 For five consecutive samples a,b,c,d,e centered at even c, the low and high numerator equations are

@@ -23,3 +23,23 @@ make test H=32 W=32 TILE=4 IMAGE=/path/to/lena.png
 Lena is not redistributed here. It is unsuitable for IEEE submissions under IEEE's Lena image policy. Use the natural alternatives for new publications.
 
 For every image the gallery computes LL/LH/HL/HH with a shared signed detail scale, a three-level pyramid, reconstruction, absolute error and six-method coefficient agreement. The optional hardware vector generator resizes a selected image to H×W, converts it to grayscale and compares all six RTL schedules to the Q6 oracle when a simulator is run. MATLAB supports local images via its existing demo.
+
+## Preferred classical benchmark suite
+
+| Image | Primary stress case |
+|---|---|
+| Lena | Smooth gradients, edges, fine texture |
+| Barbara | Periodic fabric textures |
+| Cameraman | Sharp directional edges |
+| Peppers | Curves, smooth regions and color-to-gray preprocessing |
+| Boat | Mixed structural and natural detail |
+| Mandrill | Dense high-frequency texture |
+| House | Geometric edges |
+
+Supply legally obtained local files in a directory, using names such as Lena.png, Barbara.png, Cameraman.tif, Peppers.png, Boat.png, Mandrill.png, House.png. The batch script accepts PNG/JPEG/TIFF/BMP/PGM and uses filename stems for labels. It generates software decomposition figures and exact Q6 hardware input/output vectors per image. Run:
+
+```bash
+python python/classic_benchmarks.py --directory benchmarks --size 256
+```
+
+The output manifest records original file SHA-256, preprocessing, exact software-method agreement, reconstruction error, and coefficient scaling. For image-specific RTL simulation use `make test H=32 W=32 TILE=4 IMAGE=benchmarks/Lena.png` and analogous commands for the other images. Source photographs must be obtained separately; no unverified copies or claims of executed RTL experiments are made.
