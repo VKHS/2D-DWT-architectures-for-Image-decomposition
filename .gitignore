@@ -1,3 +1,7 @@
 __pycache__/
 outputs/
 .venv/
+build/
+*.jou
+*.log
+.Xil/

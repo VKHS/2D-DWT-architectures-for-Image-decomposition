@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite this repository."
+title: "2D-DWT architectures for Image decomposition"
+type: software
+authors:
+  - family-names: "Khalili Sadaghiani"
+    given-names: "Abdolvahab"
+repository-code: "https://github.com/VKHS/2D-DWT-architectures-for-Image-decomposition"

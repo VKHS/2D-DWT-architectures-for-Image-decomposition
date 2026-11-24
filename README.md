@@ -1,6 +1,8 @@
 # 2-D DWT architectures for image decomposition
 
-A comparative software reference for six hardware-oriented implementations of the separable two-dimensional discrete wavelet transform (2-D DWT). Identical CDF 5/3 floating-point arithmetic and periodic boundaries isolate the effects of scheduling and dataflow. These are architecture models, not RTL or measured FPGA implementations.
+**Project author and maintainer: Abdolvahab Khalili Sadaghiani (VKHS).** See [authorship](AUTHOR.md) and [citation metadata](CITATION.cff).
+
+A comparative research and educational reference for six implementations of the separable two-dimensional discrete wavelet transform (2-D DWT), in Python, MATLAB and Verilog. Identical CDF 5/3 arithmetic and periodic boundaries isolate scheduling and dataflow. The Verilog uses exact integer-scaled single-level coefficients; the software supports multilevel decomposition. No physical FPGA performance is claimed.
 
 ![Six dataflow architectures](figures/architectures.svg)
 
@@ -18,6 +20,23 @@ A comparative software reference for six hardware-oriented implementations of th
 | folded | Lifting | Serial shared 1-D worker, column-first | Resource reuse versus throughput |
 
 The six are representative design choices, not a citation-count ranking. A real implementation may combine lifting, line buffering, tiling and folding. The direct and tiled variants intentionally share arithmetic, not scheduling. Line buffering assumes random-access periodic input; a strict raster-only device needs a boundary prologue/epilogue or external storage.
+
+## RTL and hardware architecture
+
+![Six hardware datapaths](figures/hardware_dataflow.svg)
+
+| ARCH | Verilog architecture | Compute clocks per H×W frame (N=HW) |
+|---:|---|---:|
+| 0 | Row-column FIR | N |
+| 1 | Fused lifting | N |
+| 2 | Direct 2-D | N/4 |
+| 3 | Five-row buffered FIR | 7N/4 |
+| 4 | Halo-tiled FIR | (N/(4T²))((2T+3)²+T²) |
+| 5 | Folded lifting | 3N |
+
+Analytical controller clocks, excluding input/output and stalls. See the [complete hardware guide](hardware/README.md) for fixed-point equations, signal protocol, memory architecture, synthesis caveats and mapping guidance. The [Verilog top](rtl/dwt53_frame.v) provides six parameterized schedules; [pair primitives](rtl/dwt53_pair.v), a [testbench](tb/tb_dwt53.v), [golden model](hardware/golden.py) and [Vivado synthesis script](scripts/synth_vivado.tcl) accompany it.
+
+Run the software and RTL regression with `make test` (requires Python dependencies and Icarus Verilog). The tests are supplied for execution; no simulator or hardware results are asserted.
 
 ## Quick start
 
